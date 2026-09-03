@@ -3,7 +3,7 @@
 # Runs on every PR to main with no path filter. Static infrastructure checks and hermetic unit
 # tests run without Azure credentials; live end-to-end tests run in the deploy pipeline.
 
-trigger: none
+trigger: none # CI runs on PRs only.
 
 pr:
   branches:
@@ -118,8 +118,8 @@ jobs:
           script: |
             set -euo pipefail
             python -m pip install uv pytest
-            [ -f "infra/scripts/post-provision/requirements.txt" ] && uv pip install --system -r "infra/scripts/post-provision/requirements.txt" || true
-            pytest
+            uv pip install --system -r src/api/python/requirements.txt
+            pytest src/test/api/python
 
   - job: unit_backend_dotnet
     displayName: Unit tests (backend, dotnet)
