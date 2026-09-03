@@ -1,7 +1,3 @@
----
-title: ADO CICD Workflows
----
-
 # ADO CICD Workflows Agent
 
 An interactive GitHub Copilot custom agent that scaffolds **Azure DevOps (ADO) CI/CD pipelines** for
