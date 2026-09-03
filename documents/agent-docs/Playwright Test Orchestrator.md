@@ -4,16 +4,13 @@
 
 ## Contents
 
-- [Playwright Test Orchestrator](#playwright-test-orchestrator)
-  - [Contents](#contents)
-  - [Prerequisites](#prerequisites)
-  - [Setup instructions](#setup-instructions)
-  - [Seed test](#seed-test)
-  - [How a conversion run works](#how-a-conversion-run-works)
-  - [Recommended model](#recommended-model)
-  - [Folder structure guidance](#folder-structure-guidance)
-  - [Known limitations and issues](#known-limitations-and-issues)
-  - [Demo instructions](#demo-instructions)
+- [Prerequisites](#prerequisites)
+- [Setup instructions](#setup-instructions)
+- [Recommended model](#recommended-model)
+- [Folder structure guidance](#folder-structure-guidance)
+- [How a conversion run works](#how-a-conversion-run-works)
+- [Known limitations and issues](#known-limitations-and-issues)
+- [Demo instructions](#demo-instructions)
 
 ## Prerequisites
 
@@ -39,23 +36,6 @@ You also need:
 2. Run the two Prerequisites commands above **inside the target repo**.
 3. Start the **`playwright-test` MCP server**: open `.vscode/mcp.json` (created by the init-agents command) and click **Start** above the `playwright-test` entry. The subagents rely on it for browser automation.
 4. Confirm a seed test exists at `tests/seed.spec.ts` (see [Seed test](#seed-test) below). The planner uses it to bootstrap the browser context, fixtures, and global setup.
-
-## Seed test
-
-Playwright agents rely on a **seed test** — a minimal spec that sets up the environment (fixtures, auth, base URL) so the planner can explore the app in a realistic context. The orchestrator expects one at `tests/seed.spec.ts`:
-
-```ts
-import { test, expect } from '@playwright/test';
-
-test.describe('Test group', () => {
-  test('seed', async ({ page }) => {
-    // Add setup here (login, navigation, feature flags) that every generated test should inherit.
-  });
-});
-```
-
-- The **Planner** runs this test first to execute global setup, project dependencies, and fixtures, and uses it as a template for every generated test.
-- Keep it minimal but representative — for authenticated apps, extend it to reach the post-login landing page.
 
 ## How a conversion run works
 
