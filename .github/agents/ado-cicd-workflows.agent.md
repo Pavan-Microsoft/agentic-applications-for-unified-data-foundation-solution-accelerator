@@ -1,5 +1,5 @@
 ---
-name: ADO CICD Infra Workflows
+name: ADO CICD Workflows
 model: ["Claude Opus 5", "GPT-5.6 Sol"]
 description: >-
   Generates best-practice Azure DevOps CI/CD pipelines for a repository's existing infrastructure

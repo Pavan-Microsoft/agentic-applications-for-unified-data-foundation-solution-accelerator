@@ -177,9 +177,9 @@ to debug. Classify by nature:
 
 | Category | CI? | What it is |
 |----------|-----|------------|
-| **run in CI** (default) | Yes | Every discovered script, **whatever it does**. Where an input is unspecified, supply the **documented or neutral default** (as a `run_step` argument) and feed stdin for "press enter" prompts. Confirm the default with the user. |
-| **manual reminder** | No (reminder) | **Only steps with no script** — actions the guide documents that a person performs by hand and that CI cannot script. Surfaced as a run-summary reminder. |
-| **developer-only** | No (excluded) | Genuinely interactive local **validation/smoke** steps with no unattended path and no deployment effect (interactive test/chat runner, IDE onboarding). |
+| **run in CI** (default) | Yes | Every discovered configuration / auth / app-deploy script, **whatever it does**. Where an input is unspecified, supply the **documented or neutral default** (as a `run_step` argument) and feed stdin for "press enter" prompts. Confirm the default with the user. **Authentication / identity-setup scripts** (app registration, consent, role assignment, OBO/SSO) are always in this category — render them to **always run, fail-soft**; **never** gate them behind an optional/default-off feature-flag variable, even when a doc feature toggle exists (let the script self-detect and no-op instead). |
+| **manual reminder** | No (reminder) | **Only steps with no script** — actions the guide documents that a person performs by hand and that CI cannot script. Also where a run-in-CI step's privileged operation may fail-soft (lacking a directory role) or leaves artifacts outside the resource group that cleanup won't remove — surfaced as a **caveat**, never as a reason to skip the step. Surfaced as a run-summary reminder. |
+| **developer-only** | No (excluded) | Genuinely interactive local **validation/smoke** steps with no unattended path and no deployment/configuration effect (interactive test/chat runner, IDE onboarding). **This includes a standalone smoke or agent/model-invocation *test* script that interactively exercises the deployed solution** — exclude it entirely; do **not** render it, not even as a gated opt-in. A *test/validation* script is not a post-deploy step: an automatable, non-interactive check belongs in the e2e job, an interactive one is excluded. |
 
 Interactive prompts (`Read-Host` / `input(` / `read -p`) do **not** by themselves force exclusion:
 if the step is otherwise a run-in-CI category and the prompt is a simple confirmation or has a
