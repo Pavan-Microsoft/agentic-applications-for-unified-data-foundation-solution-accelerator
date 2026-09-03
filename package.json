@@ -1,0 +1,25 @@
+{
+  "name": "agentic-applications-for-unified-data-foundation-solution-accelerator",
+  "version": "1.0.0",
+  "description": "Build and scale agentic AI workflows on Fabric—grounded in governed enterprise data and configured with scenario packs for each customer conversation.",
+  "main": "index.js",
+  "directories": {
+    "test": "tests"
+  },
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Pavan-Microsoft/agentic-applications-for-unified-data-foundation-solution-accelerator.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Pavan-Microsoft/agentic-applications-for-unified-data-foundation-solution-accelerator/issues"
+  },
+  "homepage": "https://github.com/Pavan-Microsoft/agentic-applications-for-unified-data-foundation-solution-accelerator#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.4.0"
+  }
+}

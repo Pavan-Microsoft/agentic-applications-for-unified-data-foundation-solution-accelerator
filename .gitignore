@@ -15,3 +15,12 @@
 scriptenv/
 __pycache__/
 /venv1/
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+.playwright-mcp
