@@ -48,10 +48,12 @@ param privateEndpointSubnetId string = ''
 @description('Private DNS zone resource IDs for Cosmos DB.')
 param privateDnsZoneResourceIds array = []
 
-var privateDnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
-  name: 'dns-zone-${i}'
-  privateDnsZoneResourceId: zoneId
-}]
+var privateDnsZoneConfigs = [
+  for (zoneId, i) in privateDnsZoneResourceIds: {
+    name: 'dns-zone-${i}'
+    privateDnsZoneResourceId: zoneId
+  }
+]
 
 // --- WAF: Redundancy ---
 @description('Enable zone redundancy.')
@@ -80,12 +82,14 @@ module cosmosAccount 'br/public:avm/res/document-db/database-account:0.19.0' = {
     sqlDatabases: [
       {
         name: databaseName
-        containers: [for container in containers: {
-          name: container.name
-          paths: [container.partitionKeyPath]
-          kind: 'Hash'
-          version: 2
-        }]
+        containers: [
+          for container in containers: {
+            name: container.name
+            paths: [container.partitionKeyPath]
+            kind: 'Hash'
+            version: 2
+          }
+        ]
       }
     ]
     sqlRoleAssignments: []
@@ -94,17 +98,19 @@ module cosmosAccount 'br/public:avm/res/document-db/database-account:0.19.0' = {
       networkAclBypass: 'None'
       publicNetworkAccess: publicNetworkAccess
     }
-    privateEndpoints: enablePrivateNetworking ? [
-      {
-        name: 'pep-${name}'
-        customNetworkInterfaceName: 'nic-${name}'
-        subnetResourceId: privateEndpointSubnetId
-        service: 'Sql'
-        privateDnsZoneGroup: {
-          privateDnsZoneGroupConfigs: privateDnsZoneConfigs
-        }
-      }
-    ] : []
+    privateEndpoints: enablePrivateNetworking
+      ? [
+          {
+            name: 'pep-${name}'
+            customNetworkInterfaceName: 'nic-${name}'
+            subnetResourceId: privateEndpointSubnetId
+            service: 'Sql'
+            privateDnsZoneGroup: {
+              privateDnsZoneGroupConfigs: privateDnsZoneConfigs
+            }
+          }
+        ]
+      : []
     zoneRedundant: zoneRedundant
     enableAutomaticFailover: enableAutomaticFailover
     managedIdentities: managedIdentities
@@ -148,3 +154,4 @@ output databaseName string = databaseName
 
 @description('Container name (first container).')
 output containerName string = containers[0].name
+

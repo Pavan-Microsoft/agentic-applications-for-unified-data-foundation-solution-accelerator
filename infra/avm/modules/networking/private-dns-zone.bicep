@@ -42,3 +42,4 @@ output resourceId string = privateDnsZone.outputs.resourceId
 
 @description('Name of the private DNS zone.')
 output name string = privateDnsZone.outputs.name
+

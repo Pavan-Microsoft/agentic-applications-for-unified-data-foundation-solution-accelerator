@@ -74,3 +74,4 @@ output connectionString string = appInsights.outputs.connectionString
 
 @description('Application ID of the Application Insights instance.')
 output applicationId string = appInsights.outputs.applicationId
+

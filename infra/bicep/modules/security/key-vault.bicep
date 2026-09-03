@@ -79,3 +79,4 @@ output uri string = keyVault.properties.vaultUri
 
 @description('The resource ID of the Key Vault.')
 output resourceId string = keyVault.id
+

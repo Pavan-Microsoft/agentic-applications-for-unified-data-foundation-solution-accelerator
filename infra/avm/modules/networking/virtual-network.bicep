@@ -329,3 +329,4 @@ type networkSecurityGroupType = {
   @description('Required. Security rules for the NSG.')
   securityRules: object[]
 }
+

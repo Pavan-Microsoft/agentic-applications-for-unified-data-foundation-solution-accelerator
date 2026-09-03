@@ -87,9 +87,11 @@ resource appService 'Microsoft.Web/sites@2025-05-01' = {
       webSocketsEnabled: webSocketsEnabled
       appCommandLine: appCommandLine
       acrUseManagedIdentityCreds: acrUseManagedIdentityCreds
-      cors: !empty(corsAllowedOrigins) ? {
-        allowedOrigins: corsAllowedOrigins
-      } : null
+      cors: !empty(corsAllowedOrigins)
+        ? {
+            allowedOrigins: corsAllowedOrigins
+          }
+        : null
     }
     endToEndEncryptionEnabled: true
   }
@@ -143,3 +145,4 @@ output appUrl string = 'https://${appService.properties.defaultHostName}'
 
 @description('System-assigned identity principal ID.')
 output identityPrincipalId string = appService.identity.principalId
+

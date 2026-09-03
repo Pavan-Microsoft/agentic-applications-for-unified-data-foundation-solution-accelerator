@@ -85,19 +85,21 @@ resource database 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases@2025-1
   }
 }
 
-resource mongoCollections 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2025-10-15' = [for collection in collections: {
-  parent: database
-  name: collection.name
-  properties: {
-    resource: {
-      id: collection.name
-      shardKey: collection.?shardKey ?? {}
-      indexes: collection.?indexes ?? [
-        { key: { keys: ['_id'] } }
-      ]
+resource mongoCollections 'Microsoft.DocumentDB/databaseAccounts/mongodbDatabases/collections@2025-10-15' = [
+  for collection in collections: {
+    parent: database
+    name: collection.name
+    properties: {
+      resource: {
+        id: collection.name
+        shardKey: collection.?shardKey ?? {}
+        indexes: collection.?indexes ?? [
+          { key: { keys: ['_id'] } }
+        ]
+      }
     }
   }
-}]
+]
 
 // ============================================================================
 // Outputs
@@ -116,3 +118,4 @@ output endpoint string = 'https://${name}.mongo.cosmos.azure.com:443/'
 
 @description('Database name.')
 output databaseName string = databaseName
+

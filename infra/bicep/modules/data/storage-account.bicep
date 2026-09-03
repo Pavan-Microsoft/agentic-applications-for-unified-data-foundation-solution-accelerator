@@ -85,13 +85,15 @@ resource blobService 'Microsoft.Storage/storageAccounts/blobServices@2025-08-01'
   name: 'default'
 }
 
-resource blobContainers 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-08-01' = [for container in containers: {
-  parent: blobService
-  name: container.name
-  properties: {
-    publicAccess: container.publicAccess
+resource blobContainers 'Microsoft.Storage/storageAccounts/blobServices/containers@2025-08-01' = [
+  for container in containers: {
+    parent: blobService
+    name: container.name
+    properties: {
+      publicAccess: container.publicAccess
+    }
   }
-}]
+]
 
 // ============================================================================
 // Outputs
@@ -107,3 +109,4 @@ output blobEndpoint string = storageAccount.properties.primaryEndpoints.blob
 
 @description('All service endpoints.')
 output serviceEndpoints object = storageAccount.properties.primaryEndpoints
+

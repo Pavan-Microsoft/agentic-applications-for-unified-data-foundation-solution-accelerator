@@ -41,3 +41,4 @@ output clientId string = managedIdentity.properties.clientId
 
 @description('Name of the managed identity.')
 output name string = managedIdentity.name
+

@@ -70,3 +70,4 @@ output resourceGroupName string = fabricCapacity.outputs.resourceGroupName
 
 @description('The location of the deployed Fabric capacity.')
 output location string = fabricCapacity.outputs.location
+

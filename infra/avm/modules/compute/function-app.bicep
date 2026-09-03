@@ -73,9 +73,12 @@ module functionApp 'br/public:avm/res/web/site:0.23.1' = {
         properties: mergedAppSettings
       }
     ]
-    siteConfig: union({
-      linuxFxVersion: '${toUpper(runtimeStack)}|${runtimeVersion}'
-    }, siteConfig)
+    siteConfig: union(
+      {
+        linuxFxVersion: '${toUpper(runtimeStack)}|${runtimeVersion}'
+      },
+      siteConfig
+    )
   }
 }
 
@@ -93,3 +96,4 @@ output defaultHostName string = functionApp.outputs.defaultHostname
 
 @description('The principal ID of the system-assigned managed identity.')
 output principalId string = functionApp.outputs.?systemAssignedMIPrincipalId ?? ''
+

@@ -91,3 +91,4 @@ output defaultHostName string = functionApp.properties.defaultHostName
 
 @description('The principal ID of the system-assigned managed identity.')
 output principalId string = contains(functionApp.identity, 'principalId') ? functionApp.identity.principalId : ''
+

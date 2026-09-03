@@ -57,24 +57,32 @@ param privateDnsZoneResourceIds array = []
 // Key Vault (AVM)
 // ============================================================================
 
-var secretItems = [for secret in secrets: {
-  name: secret.name
-  value: secret.value
-}]
-
-var dnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
-  name: 'config${i}'
-  privateDnsZoneResourceId: zoneId
-}]
-
-var privateEndpointConfig = enablePrivateNetworking && !empty(privateEndpointSubnetId) ? [
-  {
-    subnetResourceId: privateEndpointSubnetId
-    privateDnsZoneGroup: !empty(privateDnsZoneResourceIds) ? {
-      privateDnsZoneGroupConfigs: dnsZoneConfigs
-    } : null
+var secretItems = [
+  for secret in secrets: {
+    name: secret.name
+    value: secret.value
   }
-] : []
+]
+
+var dnsZoneConfigs = [
+  for (zoneId, i) in privateDnsZoneResourceIds: {
+    name: 'config${i}'
+    privateDnsZoneResourceId: zoneId
+  }
+]
+
+var privateEndpointConfig = enablePrivateNetworking && !empty(privateEndpointSubnetId)
+  ? [
+      {
+        subnetResourceId: privateEndpointSubnetId
+        privateDnsZoneGroup: !empty(privateDnsZoneResourceIds)
+          ? {
+              privateDnsZoneGroupConfigs: dnsZoneConfigs
+            }
+          : null
+      }
+    ]
+  : []
 
 module keyVault 'br/public:avm/res/key-vault/vault:0.12.1' = {
   name: take('avm.res.keyvault.vault.${name}', 64)
@@ -107,3 +115,4 @@ output uri string = keyVault.outputs.uri
 
 @description('The resource ID of the key vault.')
 output resourceId string = keyVault.outputs.resourceId
+

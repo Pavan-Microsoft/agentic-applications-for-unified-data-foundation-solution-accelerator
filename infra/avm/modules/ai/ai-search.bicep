@@ -125,3 +125,4 @@ output endpoint string = 'https://${searchService.name}.search.windows.net'
 
 @description('System-assigned identity principal ID.')
 output identityPrincipalId string = searchServiceUpdate.outputs.?systemAssignedMIPrincipalId ?? ''
+

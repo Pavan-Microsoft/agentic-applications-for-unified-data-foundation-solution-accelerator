@@ -92,16 +92,18 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-03-01' = {
     dnsPrefix: effectiveDnsPrefix
     enableRBAC: enableRBAC
     disableLocalAccounts: disableLocalAccounts
-    agentPoolProfiles: [for pool in agentPools: {
-      name: pool.name
-      vmSize: pool.vmSize
-      count: pool.count
-      minCount: pool.?enableAutoScaling == true ? pool.?minCount : null
-      maxCount: pool.?enableAutoScaling == true ? pool.?maxCount : null
-      enableAutoScaling: pool.?enableAutoScaling ?? false
-      osType: pool.?osType ?? 'Linux'
-      mode: pool.mode
-    }]
+    agentPoolProfiles: [
+      for pool in agentPools: {
+        name: pool.name
+        vmSize: pool.vmSize
+        count: pool.count
+        minCount: pool.?enableAutoScaling == true ? pool.?minCount : null
+        maxCount: pool.?enableAutoScaling == true ? pool.?maxCount : null
+        enableAutoScaling: pool.?enableAutoScaling ?? false
+        osType: pool.?osType ?? 'Linux'
+        mode: pool.mode
+      }
+    ]
     networkProfile: {
       networkPlugin: networkPlugin
       networkPolicy: !empty(networkPolicy) ? networkPolicy : null
@@ -111,14 +113,16 @@ resource aksCluster 'Microsoft.ContainerService/managedClusters@2025-03-01' = {
     autoUpgradeProfile: {
       upgradeChannel: autoUpgradeChannel
     }
-    addonProfiles: !empty(logAnalyticsWorkspaceResourceId) ? {
-      omsagent: {
-        enabled: true
-        config: {
-          logAnalyticsWorkspaceResourceID: logAnalyticsWorkspaceResourceId
+    addonProfiles: !empty(logAnalyticsWorkspaceResourceId)
+      ? {
+          omsagent: {
+            enabled: true
+            config: {
+              logAnalyticsWorkspaceResourceID: logAnalyticsWorkspaceResourceId
+            }
+          }
         }
-      }
-    } : {}
+      : {}
   }
 }
 
@@ -139,3 +143,4 @@ output kubeletIdentityObjectId string = aksCluster.properties.?identityProfile.?
 
 @description('Principal ID of the AKS control-plane system-assigned managed identity.')
 output systemAssignedMIPrincipalId string = aksCluster.identity.?principalId ?? ''
+
