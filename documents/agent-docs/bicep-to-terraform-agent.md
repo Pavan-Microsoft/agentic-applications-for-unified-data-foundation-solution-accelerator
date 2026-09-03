@@ -174,16 +174,6 @@ The skill never authors these runtime-only files: `backend.tf` overrides, `backe
   `avm-waf` are supported but have been tested less extensively.
 - **Runtime.** Converting one accelerator flavor takes approximately **30–40 minutes**, depending
   on its size.
-- **Reliance on the mapping reference.** Conversion accuracy depends heavily on
-  `references/bicep-to-terraform-mapping.md`, and that approach has limits:
-  - *It continues to grow.* Every newly discovered error class adds another entry, and a large
-    reference consumes context the agent needs for the actual conversion.
-  - *It can become outdated.* Provider arguments may be deprecated, renamed, or reversed between releases, but
-    nothing in the pipeline re-checks entries against the current provider schema.
-  - *It can drift or become inconsistent.* As several people edit the file, older guidance may
-    remain alongside newer guidance that supersedes it.
-  - *Fixes do not propagate.* The skill is copied per repository, so a lesson learned in one
-    accelerator stays in that copy until someone manually syncs the others.
 
   Other approaches are being explored.
 
