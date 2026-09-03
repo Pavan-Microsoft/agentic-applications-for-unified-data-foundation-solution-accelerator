@@ -1,0 +1,428 @@
+#!/usr/bin/env bash
+# Validate generated Terraform module parity against inspect-bicep.sh schema v2.
+# This is a structural check; run terraform validate afterward for HCL/provider
+# validation.
+#
+# Usage:
+#   validate-module-layout.sh <implementation-facts.json> [terraform-root] [contract-facts.json]
+set -euo pipefail
+
+FACTS="${1:-.agent/tmp/bicep-facts.json}"
+TF_ROOT="${2:-infra_tf}"
+CONTRACT_FACTS="${3:-$FACTS}"
+
+command -v jq >/dev/null 2>&1 || { echo "ERROR: jq required" >&2; exit 1; }
+[ -f "$FACTS" ] || { echo "ERROR: facts file '$FACTS' not found" >&2; exit 1; }
+[ -f "$CONTRACT_FACTS" ] || { echo "ERROR: contract facts file '$CONTRACT_FACTS' not found" >&2; exit 1; }
+[ -d "$TF_ROOT" ] || { echo "ERROR: Terraform root '$TF_ROOT' not found" >&2; exit 1; }
+
+SCHEMA_VERSION="$(jq -r '.schemaVersion // 0' "$FACTS")"
+[ "$SCHEMA_VERSION" = "3" ] || {
+  echo "ERROR: '$FACTS' uses schemaVersion $SCHEMA_VERSION; rerun the current inspect-bicep.sh" >&2
+  exit 1
+}
+CONTRACT_SCHEMA_VERSION="$(jq -r '.schemaVersion // 0' "$CONTRACT_FACTS")"
+[ "$CONTRACT_SCHEMA_VERSION" = "3" ] || {
+  echo "ERROR: '$CONTRACT_FACTS' uses schemaVersion $CONTRACT_SCHEMA_VERSION; rerun the current inspect-bicep.sh" >&2
+  exit 1
+}
+
+to_snake_case() {
+  printf '%s' "$1" \
+    | sed -E 's/([A-Z]+)([A-Z][a-z])/\1_\2/g; s/([a-z0-9])([A-Z])/\1_\2/g' \
+    | tr '[:upper:]' '[:lower:]'
+}
+
+to_contract_output_name() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
+}
+
+module_directory() {
+  local manifest_path="$1"
+  local relative="$manifest_path"
+  case "$relative" in
+    infra_tf/*) relative="${relative#infra_tf/}" ;;
+  esac
+  printf '%s/%s\n' "${TF_ROOT%/}" "$relative"
+}
+
+ERRORS=0
+MODULE_COUNT=0
+
+fail() {
+  echo "ERROR: $*" >&2
+  ERRORS=$((ERRORS + 1))
+}
+
+require_block() {
+  local file="$1"
+  local block_type="$2"
+  local block_name="$3"
+  local context="$4"
+  grep -Eq "^[[:space:]]*$block_type[[:space:]]+\"$block_name\"[[:space:]]*\\{" "$file" \
+    || fail "$context is missing $block_type \"$block_name\" in $(basename "$file")"
+}
+
+require_sensitive_block() {
+  local file="$1"
+  local block_type="$2"
+  local block_name="$3"
+  local context="$4"
+  awk -v type="$block_type" -v name="$block_name" '
+    $0 ~ "^[[:space:]]*" type "[[:space:]]+\"" name "\"[[:space:]]*\\{" { in_block=1; next }
+    in_block && $0 ~ "^[[:space:]]*(variable|output)[[:space:]]+\"" { exit }
+    in_block && $0 ~ "sensitive[[:space:]]*=[[:space:]]*true" { found=1; exit }
+    END { exit(found ? 0 : 1) }
+  ' "$file" || fail "$context must set sensitive = true in $(basename "$file")"
+}
+
+require_default_block() {
+  local file="$1"
+  local block_name="$2"
+  local context="$3"
+  awk -v name="$block_name" '
+    $0 ~ "^[[:space:]]*variable[[:space:]]+\"" name "\"[[:space:]]*\\{" {
+      in_block=1
+      if ($0 ~ "default[[:space:]]*=") found=1
+      next
+    }
+    in_block && $0 ~ "^[[:space:]]*(variable|output)[[:space:]]+\"" { exit }
+    in_block && $0 ~ "^[[:space:]]*default[[:space:]]*=" { found=1; exit }
+    END { exit(found ? 0 : 1) }
+  ' "$file" || fail "$context must preserve its Bicep default in $(basename "$file")"
+}
+
+PATH_COLLISIONS="$(jq '
+  [
+    [.files[] | select(.entrypoint | not)]
+    | sort_by(.terraformModulePath)
+    | group_by(.terraformModulePath)[]
+    | select(length > 1)
+    | {terraformModulePath: .[0].terraformModulePath, sources: map(.source)}
+  ]
+' "$FACTS")"
+if [ "$(printf '%s' "$PATH_COLLISIONS" | jq 'length')" -ne 0 ]; then
+  fail "implementation manifest contains colliding Terraform module paths: $(printf '%s' "$PATH_COLLISIONS" | jq -c .)"
+fi
+
+while IFS=$'\t' read -r SOURCE MANIFEST_PATH; do
+  SOURCE="${SOURCE%$'\r'}"
+  MANIFEST_PATH="${MANIFEST_PATH%$'\r'}"
+  [ -n "${SOURCE:-}" ] || continue
+  MODULE_COUNT=$((MODULE_COUNT + 1))
+  MODULE_DIR="$(module_directory "$MANIFEST_PATH")"
+
+  if [ ! -d "$MODULE_DIR" ]; then
+    fail "$SOURCE has no generated module directory '$MODULE_DIR'"
+    continue
+  fi
+
+  for required_file in main.tf variables.tf outputs.tf versions.tf; do
+    [ -f "$MODULE_DIR/$required_file" ] \
+      || fail "$SOURCE is missing '$MODULE_DIR/$required_file'"
+  done
+
+  if [ -f "$MODULE_DIR/variables.tf" ]; then
+    while IFS= read -r BICEP_NAME; do
+      BICEP_NAME="${BICEP_NAME%$'\r'}"
+      [ -n "$BICEP_NAME" ] || continue
+      TF_NAME="$(to_snake_case "$BICEP_NAME")"
+      require_block "$MODULE_DIR/variables.tf" variable "$TF_NAME" "$SOURCE parameter '$BICEP_NAME'"
+    done < <(jq -r --arg source "$SOURCE" '
+      .files[] | select(.source == $source) | .parameters[].name
+    ' "$FACTS")
+
+    while IFS= read -r BICEP_NAME; do
+      BICEP_NAME="${BICEP_NAME%$'\r'}"
+      [ -n "$BICEP_NAME" ] || continue
+      TF_NAME="$(to_snake_case "$BICEP_NAME")"
+      require_sensitive_block "$MODULE_DIR/variables.tf" variable "$TF_NAME" \
+        "$SOURCE secure parameter '$BICEP_NAME'"
+    done < <(jq -r --arg source "$SOURCE" '
+      .files[] | select(.source == $source) | .parameters[] | select(.secure) | .name
+    ' "$FACTS")
+
+    while IFS= read -r BICEP_NAME; do
+      BICEP_NAME="${BICEP_NAME%$'\r'}"
+      [ -n "$BICEP_NAME" ] || continue
+      TF_NAME="$(to_snake_case "$BICEP_NAME")"
+      require_default_block "$MODULE_DIR/variables.tf" "$TF_NAME" \
+        "$SOURCE parameter '$BICEP_NAME'"
+    done < <(jq -r --arg source "$SOURCE" '
+      .files[] | select(.source == $source) | .parameters[] | select(.hasDefault) | .name
+    ' "$FACTS")
+  fi
+
+  if [ -f "$MODULE_DIR/outputs.tf" ]; then
+    while IFS= read -r BICEP_NAME; do
+      BICEP_NAME="${BICEP_NAME%$'\r'}"
+      [ -n "$BICEP_NAME" ] || continue
+      TF_NAME="$(to_snake_case "$BICEP_NAME")"
+      require_block "$MODULE_DIR/outputs.tf" output "$TF_NAME" "$SOURCE output '$BICEP_NAME'"
+    done < <(jq -r --arg source "$SOURCE" '
+      .files[] | select(.source == $source) | .outputs[].name
+    ' "$FACTS")
+
+    while IFS= read -r BICEP_NAME; do
+      BICEP_NAME="${BICEP_NAME%$'\r'}"
+      [ -n "$BICEP_NAME" ] || continue
+      TF_NAME="$(to_snake_case "$BICEP_NAME")"
+      require_sensitive_block "$MODULE_DIR/outputs.tf" output "$TF_NAME" \
+        "$SOURCE secure output '$BICEP_NAME'"
+    done < <(jq -r --arg source "$SOURCE" '
+      .files[] | select(.source == $source) | .outputs[] | select(.secure) | .name
+    ' "$FACTS")
+  fi
+
+  if [ -f "$MODULE_DIR/main.tf" ] && [ -f "$MODULE_DIR/versions.tf" ]; then
+    for provider in azurerm azapi random; do
+      if grep -Eq "(resource|data)[[:space:]]+\"${provider}_[^\"]+\"" "$MODULE_DIR"/*.tf; then
+        grep -Eq "^[[:space:]]*$provider[[:space:]]*=" "$MODULE_DIR/versions.tf" \
+          || fail "$SOURCE uses $provider but '$MODULE_DIR/versions.tf' does not declare it"
+      fi
+    done
+  fi
+done < <(jq -r '
+  .files[]
+  | select(.entrypoint | not)
+  | [.source, .terraformModulePath]
+  | @tsv
+' "$FACTS")
+
+EXPECTED_COUNT="$(jq '[.files[] | select(.entrypoint | not)] | length' "$FACTS")"
+if [ "$MODULE_COUNT" -ne "$EXPECTED_COUNT" ]; then
+  fail "validated $MODULE_COUNT modules but the manifest contains $EXPECTED_COUNT"
+fi
+
+for root_file in main.tf variables.tf outputs.tf providers.tf terraform.tfvars; do
+  [ -f "$TF_ROOT/$root_file" ] || fail "Terraform root is missing '$TF_ROOT/$root_file'"
+done
+
+if [ -f "$TF_ROOT/variables.tf" ]; then
+  while IFS= read -r BICEP_NAME; do
+    BICEP_NAME="${BICEP_NAME%$'\r'}"
+    [ -n "$BICEP_NAME" ] || continue
+    TF_NAME="$(to_snake_case "$BICEP_NAME")"
+    require_block "$TF_ROOT/variables.tf" variable "$TF_NAME" "contract parameter '$BICEP_NAME'"
+  done < <(jq -r '.files[] | select(.entrypoint) | .parameters[].name' "$CONTRACT_FACTS")
+
+  while IFS= read -r BICEP_NAME; do
+    BICEP_NAME="${BICEP_NAME%$'\r'}"
+    [ -n "$BICEP_NAME" ] || continue
+    TF_NAME="$(to_snake_case "$BICEP_NAME")"
+    require_sensitive_block "$TF_ROOT/variables.tf" variable "$TF_NAME" \
+      "secure contract parameter '$BICEP_NAME'"
+  done < <(jq -r '.files[] | select(.entrypoint) | .parameters[] | select(.secure) | .name' "$CONTRACT_FACTS")
+
+  while IFS= read -r BICEP_NAME; do
+  BICEP_NAME="${BICEP_NAME%$'\r'}"
+  [ -n "$BICEP_NAME" ] || continue
+  TF_NAME="$(to_snake_case "$BICEP_NAME")"
+  require_default_block "$TF_ROOT/variables.tf" "$TF_NAME" \
+    "contract parameter '$BICEP_NAME'"
+  done < <(jq -r '
+  .files[] | select(.entrypoint) | .parameters[] | select(.hasDefault) | .name
+  ' "$CONTRACT_FACTS")
+
+  if grep -Eq '^[[:space:]]*variable[[:space:]]+"deployer_principal_id"[[:space:]]*\{' \
+  "$TF_ROOT/variables.tf"; then
+  if ! jq -e '
+    any(.files[] | select(.entrypoint) | .parameters[];
+      (.name | ascii_downcase) == "deployerprincipalid")
+  ' "$CONTRACT_FACTS" >/dev/null; then
+    require_default_block "$TF_ROOT/variables.tf" "deployer_principal_id" \
+      "derived deployment-context variable 'deployer_principal_id'"
+  fi
+  fi
+fi
+
+if [ -f "$TF_ROOT/outputs.tf" ]; then
+  while IFS= read -r BICEP_NAME; do
+    BICEP_NAME="${BICEP_NAME%$'\r'}"
+    [ -n "$BICEP_NAME" ] || continue
+    TF_NAME="$(to_contract_output_name "$BICEP_NAME")"
+    require_block "$TF_ROOT/outputs.tf" output "$TF_NAME" "contract output '$BICEP_NAME'"
+  done < <(jq -r '.files[] | select(.entrypoint) | .outputs[].name' "$CONTRACT_FACTS")
+
+  while IFS= read -r BICEP_NAME; do
+    BICEP_NAME="${BICEP_NAME%$'\r'}"
+    [ -n "$BICEP_NAME" ] || continue
+    TF_NAME="$(to_contract_output_name "$BICEP_NAME")"
+    require_sensitive_block "$TF_ROOT/outputs.tf" output "$TF_NAME" \
+      "secure contract output '$BICEP_NAME'"
+  done < <(jq -r '.files[] | select(.entrypoint) | .outputs[] | select(.secure) | .name' "$CONTRACT_FACTS")
+fi
+
+if [ -f "$TF_ROOT/providers.tf" ]; then
+  for provider in azurerm azapi random; do
+    if grep -Eq "(resource|data)[[:space:]]+\"${provider}_[^\"]+\"" "$TF_ROOT"/*.tf; then
+      grep -Eq "^[[:space:]]*$provider[[:space:]]*=" "$TF_ROOT/providers.tf" \
+        || fail "Terraform root uses $provider but '$TF_ROOT/providers.tf' does not declare it"
+    fi
+  done
+fi
+
+while IFS=: read -r FILE LINE _; do
+  [ -n "${FILE:-}" ] || continue
+  fail "$FILE:$LINE uses deprecated disable_ip_masking; use polarity-correct ip_masking_enabled"
+done < <(grep -RInE --exclude-dir='.terraform' --include='*.tf' '^[[:space:]]*disable_ip_masking[[:space:]]*=' "$TF_ROOT" || true)
+
+while IFS=: read -r FILE LINE _; do
+  [ -n "${FILE:-}" ] || continue
+  fail "$FILE:$LINE uses collection contains() for a SystemAssigned string check; use strcontains()"
+done < <(grep -RInE --exclude-dir='.terraform' --include='*.tf' 'contains\([^,]+,[[:space:]]*"SystemAssigned"\)' "$TF_ROOT" || true)
+
+while IFS=: read -r FILE LINE _; do
+  [ -n "${FILE:-}" ] || continue
+  fail "$FILE:$LINE derives count from an ID that may be unknown until apply; pass a configuration-known boolean"
+done < <(
+  grep -RInE --exclude-dir='.terraform' --include='*.tf' \
+    '^[[:space:]]*count[[:space:]]*=.*var\.[A-Za-z0-9_]*(resource_id|principal_id|account_id|_id)[[:space:]]*!=[[:space:]]*""' \
+    "$TF_ROOT" || true
+)
+
+while IFS=: read -r FILE LINE _; do
+  [ -n "${FILE:-}" ] || continue
+  fail "$FILE:$LINE derives for_each from an ID that may be unknown until apply; use configuration-known map keys"
+done < <(
+  grep -RInE --exclude-dir='.terraform' --include='*.tf' \
+    '^[[:space:]]*for_each[[:space:]]*=.*var\.[A-Za-z0-9_]*(resource_id|principal_id|account_id|_id)[[:space:]]*!=[[:space:]]*""' \
+    "$TF_ROOT" || true
+)
+
+while IFS=: read -r FILE LINE _; do
+  [ -n "${FILE:-}" ] || continue
+  fail "$FILE:$LINE uses generated principal IDs as set keys; use a map with static semantic keys"
+done < <(
+  grep -RInE --exclude-dir='.terraform' --include='*.tf' \
+    '^[[:space:]]*for_each[[:space:]]*=.*toset\([^)]*[Pp]rincipal' \
+    "$TF_ROOT" || true
+)
+
+find_azapi_create_type() {
+  local type_pattern="$1"
+  find "$TF_ROOT" -path "$TF_ROOT/.terraform" -prune -o -type f -name '*.tf' -print0 |
+    while IFS= read -r -d '' file; do
+      awk -v type_pattern="$type_pattern" '
+        /^[[:space:]]*resource[[:space:]]+"azapi_resource"[[:space:]]+"/ {
+          in_azapi_resource = 1
+          next
+        }
+        /^[[:space:]]*(resource|data|module|variable|output|locals)[[:space:]]/ {
+          in_azapi_resource = 0
+        }
+        in_azapi_resource && $0 ~ type_pattern {
+          print FILENAME ":" FNR ":" $0
+        }
+      ' "$file"
+    done
+}
+
+while IFS=: read -r FILE LINE _; do
+  [ -n "${FILE:-}" ] || continue
+  fail "$FILE:$LINE creates resource-group tags separately; set azurerm_resource_group.tags"
+done < <(find_azapi_create_type 'Microsoft.Resources/tags@')
+
+while IFS=: read -r FILE LINE _; do
+  [ -n "${FILE:-}" ] || continue
+  fail "$FILE:$LINE creates a service-owned Web child; use the parent argument or azapi_update_resource"
+done < <(find_azapi_create_type 'Microsoft.Web/sites/(basicPublishingCredentialsPolicies|config)@')
+
+while IFS=: read -r FILE LINE _; do
+  [ -n "${FILE:-}" ] || continue
+  fail "$FILE:$LINE creates the automatic blob service; use blob_properties or azapi_update_resource"
+done < <(find_azapi_create_type 'Microsoft.Storage/storageAccounts/blobServices@')
+
+azapi_resource_has_response_export() {
+  local module_dir="$1"
+  local resource_name="$2"
+  local file
+  while IFS= read -r -d '' file; do
+    if awk -v resource_name="$resource_name" '
+      $0 ~ "^[[:space:]]*resource[[:space:]]+\"azapi_resource\"[[:space:]]+\"" resource_name "\"[[:space:]]*\\{" {
+        in_resource = 1
+        next
+      }
+      /^[[:space:]]*(resource|data|module|variable|output|locals)[[:space:]]/ {
+        in_resource = 0
+      }
+      in_resource && /^[[:space:]]*response_export_values[[:space:]]*=/ {
+        found = 1
+      }
+      END { if (found) exit 0; exit 1 }
+    ' "$file"; then
+      return 0
+    fi
+  done < <(find "$module_dir" -maxdepth 1 -type f -name '*.tf' -print0)
+  return 1
+}
+
+while IFS=: read -r FILE LINE _; do
+  [ -n "${FILE:-}" ] || continue
+  module_dir="$(dirname "$FILE")"
+  while IFS= read -r RESOURCE_NAME; do
+    [ -n "$RESOURCE_NAME" ] || continue
+    if ! azapi_resource_has_response_export "$module_dir" "$RESOURCE_NAME"; then
+      fail "$FILE:$LINE reads azapi_resource.$RESOURCE_NAME.output without response_export_values"
+    fi
+  done < <(
+    sed -n "${LINE}p" "$FILE" |
+      grep -Eo 'azapi_resource\.[A-Za-z0-9_]+\.output\.' |
+      sed -E 's/^azapi_resource\.([A-Za-z0-9_]+)\.output\.$/\1/' |
+      sort -u
+  )
+done < <(
+  grep -RInHE --exclude-dir='.terraform' --include='*.tf' \
+    '(^|[=({[:space:]"])azapi_resource\.[A-Za-z0-9_]+\.output\.' "$TF_ROOT" || true
+)
+
+find_parallel_model_modules() {
+  find "$TF_ROOT" -path "$TF_ROOT/.terraform" -prune -o -type f -name '*.tf' -print0 |
+    while IFS= read -r -d '' file; do
+      awk '
+        function report_if_invalid() {
+          if (in_module && has_for_each && is_model_deployment) {
+            print FILENAME ":" module_line ":module uses for_each for serialized model deployments"
+          }
+        }
+        /^[[:space:]]*module[[:space:]]+"/ {
+          report_if_invalid()
+          in_module = 1
+          has_for_each = 0
+          is_model_deployment = 0
+          module_line = FNR
+          next
+        }
+        /^[[:space:]]*(resource|data|variable|output|locals)[[:space:]]/ {
+          report_if_invalid()
+          in_module = 0
+        }
+        in_module && /^[[:space:]]*for_each[[:space:]]*=/ { has_for_each = 1 }
+        in_module && /^[[:space:]]*source[[:space:]]*=.*model-deployment/ {
+          is_model_deployment = 1
+        }
+        END { report_if_invalid() }
+      ' "$file"
+    done
+}
+
+while IFS=: read -r FILE LINE _; do
+  [ -n "${FILE:-}" ] || continue
+  fail "$FILE:$LINE deploys models concurrently under one parent; use explicit depends_on chaining"
+done < <(find_parallel_model_modules)
+
+while IFS=: read -r FILE LINE _; do
+  [ -n "${FILE:-}" ] || continue
+  fail "$FILE:$LINE uses the current object ID as a Fabric admin; interactive users require a UPN"
+done < <(
+  grep -RInE --exclude-dir='.terraform' --include='*.tf' \
+    'fabric[_A-Za-z]*admin[_A-Za-z]*.*data\.azurerm_client_config\.current\.object_id' \
+    "$TF_ROOT" || true
+)
+
+if [ "$ERRORS" -ne 0 ]; then
+  echo "Module layout validation failed with $ERRORS error(s)." >&2
+  exit 1
+fi
+
+echo "Module layout validation passed: root contract plus $MODULE_COUNT source module(s), four required child files each, complete parameter/output blocks, sensitive markings, and declared providers."
