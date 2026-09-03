@@ -253,6 +253,13 @@ current identifier with a read-only Azure CLI lookup while generating the select
 tfvars, or expose a nullable provider-forced override and document it. Validate every additional
 member as an existing Entra user, service principal, or managed identity before apply.
 
+A nullable UPN override alone is not enough: when the override is unset, falling back to the
+deployer object ID fails at apply with `400 BadRequest: All provided principals must be existing,
+user or service principals`. Make the fallback identifier-type aware — use the object ID only when
+the deployer principal type is `ServicePrincipal`, and yield an empty list for `User` — then add a
+`validation` block on the Fabric module's `admin_members` variable requiring a non-empty list. That
+converts an apply-time 400 into a plan-time error naming the override to set.
+
 ## Provider skeleton (`providers.tf`)
 
 ```hcl
