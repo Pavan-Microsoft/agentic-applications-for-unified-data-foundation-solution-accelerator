@@ -1,13 +1,13 @@
 # Bicep → Terraform Converter Agent
 
-A GitHub Copilot custom agent that produces a **1:1 Terraform port** of an existing Bicep
+A GitHub Copilot custom agent that produces a **1:1 Terraform port** of existing Bicep
 infrastructure. The port is written to a new `infra_tf/` directory that **coexists** with the
-original `infra/`; the Bicep is never modified.
+original `infra/`; the source Bicep remains unchanged.
 
-The port preserves the **output contract** — every output the source `main.bicep` emits
+The port preserves the **output contract**: every output emitted by the source `main.bicep`
 also exists in `infra_tf/outputs.tf` with an equivalent value.
 
-The agent authors HCL. It does **not** deploy, and it does not generate CI/CD workflows.
+The agent authors HCL. It does **not** deploy infrastructure or generate CI/CD workflows.
 
 ---
 
@@ -33,10 +33,10 @@ The agent authors HCL. It does **not** deploy, and it does not generate CI/CD wo
 | **Azure CLI** with the Bicep extension | `inspect-bicep.sh` runs `az bicep build` | `az bicep version` |
 | **jq** | The discovery script parses compiled ARM JSON | `jq --version` |
 | **Terraform** ≥ 1.5 | The mandatory `fmt` / `init` / `validate` gate | `terraform version` |
-| **Bash** | Both skill scripts are bash | see the Windows note below |
+| **Bash** | Runs both skill scripts | See the Windows note below |
 
-`inspect-bicep.sh` hard-fails with `ERROR: az CLI required` or `ERROR: jq required` if either is
-missing, so verify both before the first run.
+`inspect-bicep.sh` exits with `ERROR: az CLI required` or `ERROR: jq required` if either tool is
+missing. Verify both before the first run.
 
 > **Windows users:** run the skill scripts under **Git Bash**
 > (`C:\Program Files\Git\bin\bash.exe`). The `bash.exe` shipped in `System32` is a WSL relay and
@@ -52,15 +52,15 @@ missing, so verify both before the first run.
 
 ## Setup instructions
 
-Copy **only** these two items into the target accelerator repository, alongside its existing agents
-and skills.
+Copy **only** these two items into the target accelerator repository alongside its existing agents
+and skills:
 
 | Path | Purpose |
 |---|---|
 | `.github/agents/bicep-to-terraform.agent.md` | Registers the custom agent |
 | `.github/skills/bicep-to-terraform/` | The complete converter skill — copy the entire directory |
 
-Resulting layout in the target repository:
+The resulting layout in the target repository is:
 
 ```
 <target-repository>/
@@ -95,14 +95,14 @@ Then:
 
 ## Recommended model
 
-Use a **top-tier reasoning model** (Claude Opus 5 or GPT-5.6-sol).
+Use a **top-tier reasoning model**, such as Claude Opus 5 or GPT-5.6 Sol.
 
 ---
 
 ## Folder structure guidance
 
-Everything generated lands under `infra_tf/`, mirroring the Bicep module hierarchy so the 1:1
-mapping stays legible:
+All generated files are written under `infra_tf/`. The Bicep module hierarchy is mirrored so the
+1:1 mapping remains easy to understand:
 
 ```
 infra_tf/
@@ -124,11 +124,12 @@ infra_tf/
 
 **Rules the agent enforces**
 
-- **One source module → one generated module.** A Bicep file called several times still produces a
-  single directory, called several times. Modules are never flattened or combined.
+- **One source module → one generated module.** A Bicep file referenced multiple times still
+  produces one module directory, which can be called multiple times. Modules are never flattened
+  or combined.
 - **Four files in every child module**, even when a file would be empty.
-- **Provider config is root-only.** Child modules declare provider *requirements* in `versions.tf`;
-  credentials and subscription live only in the root `providers.tf`.
+- **Provider configuration is root-only.** Child modules declare provider *requirements* in
+  `versions.tf`; credentials and subscription settings exist only in the root `providers.tf`.
 
 > **Do not commit `.terraform/`.** `terraform init` downloads provider binaries of several hundred
 > MB, which exceed GitHub's 100 MB file limit and will break `git push`. The generated
@@ -136,8 +137,8 @@ infra_tf/
 > backend files, while deliberately **keeping `.terraform.lock.hcl` tracked** so provider versions
 > stay pinned.
 
-Runtime-only files never authored by this skill: `backend.tf` overrides, `backend.ci.hcl`,
-`state-scope.auto.tfvars`, `.terraform/`, `*.tfstate*`, `tfplan`.
+The skill never authors these runtime-only files: `backend.tf` overrides, `backend.ci.hcl`,
+`state-scope.auto.tfvars`, `.terraform/`, `*.tfstate*`, or `tfplan`.
 
 ---
 
@@ -147,16 +148,18 @@ Runtime-only files never authored by this skill: `backend.tf` overrides, `backen
    `avm-waf`), the agent asks which single flavor to port. If only one implementation exists, or
    the prompt names a flavor and entrypoint, it proceeds without asking. **One flavor per run.**
 2. **Discovery (read-only).** `inspect-bicep.sh` compiles every reachable local module and writes
-   `.agent/tmp/bicep-facts.json` — parameters, ARM-resolved variables, resources, `existing`
+   `.agent/tmp/bicep-facts.json`, which contains parameters, ARM-resolved variables, resources, `existing`
    resources, module graph, outputs, and provider hints.
 3. **Approval gate.** The agent presents the inventory, the preserved-output list, and the
    source-file → module mapping. **Nothing is written until you approve.**
-4. **Authoring.** Root files, then the full mirrored module tree, then `terraform.tfvars`.
+4. **Authoring.** The agent creates the root files, the complete mirrored module tree, and
+   `terraform.tfvars`.
 5. **Validation gate.** The agent runs `validate-module-layout.sh`, `terraform fmt -recursive`,
    `terraform init -backend=false`, and `terraform validate`, iterating until clean. When it hits a
    class of error not already covered, it fixes the port **and** appends a note to
    `references/bicep-to-terraform-mapping.md` so later runs avoid it.
-6. **Report.** Inventory, output contract, generated files, deviations, validation results.
+6. **Report.** The agent summarizes the inventory, output contract, generated files, deviations,
+   and validation results.
 
 ---
 
@@ -164,26 +167,15 @@ Runtime-only files never authored by this skill: `backend.tf` overrides, `backen
 
 - **One flavor per run.** Converting both `bicep` and `avm` means two separate runs.
 - **Authoring only — no runtime verification.** The agent never runs `terraform plan` or `apply`, so
-  it can only prove syntax and provider-schema correctness. Errors that surface only at plan or
-  apply time need a human in the loop. Paste the failure back to the same agent; it will analyse
-  the error and apply the fix.
+  it can verify only syntax and provider-schema correctness. Errors that appear only during
+  `terraform plan` or `terraform apply` require human involvement. Paste the failure into the same
+  agent so it can analyze the error and apply the fix.
 - **Testing coverage.** The agent has mainly been exercised against the `bicep` flavor. `avm` and
-  `avm-waf` are supported but less proven.
-- **Runtime.** A single flavor of one accelerator takes roughly **30–40 minutes**, depending on size.
-- **Reliance on `mapping.md`.** Conversion accuracy depends heavily on
-  `references/bicep-to-terraform-mapping.md`, and that approach has limits:
-  - *It grows without bound.* Every newly discovered error class adds another entry, and a large
-    reference consumes context the agent needs for the actual conversion.
-  - *It is reactive, not preventive.* It only covers mistakes someone has already hit; a brand-new
-    resource type or provider argument is still a first-time failure.
-  - *It goes stale.* Provider arguments get deprecated, renamed, or flipped between releases, but
-    nothing in the pipeline re-checks entries against the current provider schema.
-  - *It drifts and can contradict itself.* As the file is edited by several people, older guidance
-    can survive alongside newer guidance that supersedes it.
-  - *Fixes do not propagate.* The skill is copied per repository, so a lesson learned in one
-    accelerator stays in that copy until someone manually syncs the others.
+  `avm-waf` are supported but have been tested less extensively.
+- **Runtime.** Converting one accelerator flavor takes approximately **30–40 minutes**, depending
+  on its size.
 
-  We are exploring other approaches.
+  Other approaches are being explored.
 
 ---
 
@@ -203,7 +195,8 @@ Convert the existing Bicep infrastructure in this repository to Terraform.
 4. If asked, choose the **single flavor** to convert.
 5. Review the analysis and conversion plan, then type **Approve**.
 6. Wait for generation and the validation gate (**~30–40 minutes** for a full accelerator).
-7. Review the generated Terraform, `terraform.tfvars`, preserved outputs, deviations, and gate results.
+7. Review the generated Terraform, `terraform.tfvars`, preserved outputs, deviations, and gate
+   results.
 
 ### Expected result
 
@@ -214,7 +207,7 @@ Convert the existing Bicep infrastructure in this repository to Terraform.
 - The layout and `terraform validate` gates pass.
 - The agent does **not** run `terraform plan` or `terraform apply`.
 
-### Optional: deploy locally to verify
+### Optional: deploy locally for verification
 
 The agent never deploys. Use these steps only to test in a **disposable Azure test subscription**.
 
@@ -231,7 +224,7 @@ The agent never deploys. Use these steps only to test in a **disposable Azure te
 
    Without it, `terraform init -reconfigure` uses local state.
 
-2. Sign in and deploy:
+2. Sign in to Azure and deploy:
 
    ```bash
    cd infra_tf
@@ -257,9 +250,9 @@ $env:TF_VAR_resource_group_name = "<test-resource-group-name>"
 terraform plan -out=tfplan
 ```
 
-`terraform apply tfplan` applies the approved saved plan without re-prompting. Running
-`terraform apply` *without* a saved plan asks for `yes` — review the plan before confirming. Note
-that any plan saved **before** an HCL, tfvars, or state change is stale; regenerate it.
+`terraform apply tfplan` applies the approved saved plan without prompting again. Running
+`terraform apply` *without* a saved plan prompts for `yes`; review the plan before confirming.
+Any plan saved **before** an HCL, tfvars, or state change is stale and must be regenerated.
 
 > Local state, `tfplan`, `.terraform/`, and backend configuration can contain sensitive deployment
 > information. Keep them git-ignored and never commit them. Never commit secrets to
@@ -274,7 +267,7 @@ All paths below are relative to `.github/skills/bicep-to-terraform/`.
 | Document | Contents |
 |---|---|
 | `SKILL.md` | The canonical process the agent follows |
-| `references/bicep-to-terraform-mapping.md` | Construct/resource/function mapping, plan-time cardinality, azapi gotchas, apply-time failure triage |
+| `references/bicep-to-terraform-mapping.md` | Construct/resource/function mapping, plan-time cardinality, AzAPI considerations, apply-time failure triage |
 | `references/naming-conventions.md` | `infra_tf/` layout, naming, tfvars, backend conventions |
 | `scripts/inspect-bicep.sh` | Read-only discovery → `bicep-facts.json` (`schemaVersion: 3`) |
 | `scripts/validate-module-layout.sh` | Structural and semantic gate over the generated tree |
