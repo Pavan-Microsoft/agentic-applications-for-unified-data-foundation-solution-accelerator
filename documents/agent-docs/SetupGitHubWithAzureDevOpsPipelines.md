@@ -10,55 +10,41 @@ The **Azure Pipelines GitHub App** (GitHub side) and the **GitHub service connec
 flowchart LR
     dev([Developer])
 
-    subgraph GH [GitHub - source of truth]
-        direction TB
-        repo[(Repository<br/>code + *.yml)]
-        app{{Azure Pipelines<br/>GitHub App<br/>installed on org/repo}}
-        checks[/Commit status<br/>+ PR checks/]
-        repo --- app
-        app --- checks
+    subgraph GitHub [GitHub - source of truth]
+        repo[Repository<br/>code + pipeline YAML]
+        app[Azure Pipelines<br/>GitHub App]
     end
 
-    subgraph ADO [Azure DevOps project]
-        direction TB
-        sc[[GitHub service connection<br/>github.com_&lt;owner&gt;<br/>stores app credential]]
-        pl[Pipeline definition<br/>points to owner/repo + yml path]
-        agent[Build agent<br/>Microsoft-hosted / self-hosted]
-        pl --> agent
-        pl -. authenticates via .-> sc
+    subgraph ADO [Azure DevOps]
+        conn[GitHub service<br/>connection]
+        pipe[Pipeline<br/>build / test / deploy]
     end
 
     dev -->|1 push / open PR| repo
-    app ==>|2 webhook: push / PR / schedule| pl
-    agent ==>|3 clone repo + read yml<br/>using service connection| sc
-    sc -->|token| repo
-    agent -->|4 run build + test| agent
-    agent ==>|5 report status back| checks
-
-    classDef gh fill:#f6f8fa,stroke:#8b949e,color:#24292f;
-    classDef ado fill:#eef5ff,stroke:#4a86d8,color:#0b3d91;
-    class repo,app,checks gh;
-    class sc,pl,agent ado;
+    repo -->|2 notify event| app
+    app -->|3 trigger run| pipe
+    pipe -->|4 authenticate| conn
+    conn -->|5 clone repo| repo
+    pipe -->|6 report status| repo
 ```
 
 ### Components
 
 | Component | Lives in | What it does |
 |-----------|----------|--------------|
-| Repository (code + `*.yml`) | GitHub | Single source of truth. Holds the application code and the pipeline YAML files (for example `azure-pipelines-bicep-ci.yml`). |
-| Azure Pipelines GitHub App | GitHub (org or repo) | Integration point. Grants Azure DevOps scoped access to the repo and forwards GitHub events (push, PR, schedule). Installed once. |
-| Commit status / PR checks | GitHub | Where the pipeline result appears — the check on a commit or pull request. |
-| GitHub service connection (`github.com_<owner>`) | Azure DevOps project | Azure DevOps-side counterpart of the app. Stores the app credential and is what the pipeline authenticates through. Created automatically when the app is linked. |
-| Pipeline definition | Azure DevOps project | A thin pointer recording `owner/repo`, the YAML path, and the service connection to use. No code or YAML is copied here. |
-| Build agent | Azure DevOps (Microsoft-hosted or self-hosted) | The machine that clones the repo, reads the YAML, and runs the build, test, and deploy steps. |
+| Repository (code + YAML) | GitHub | Source of truth. Holds the code and the pipeline YAML files. |
+| Azure Pipelines GitHub App | GitHub | Connects GitHub to Azure DevOps and forwards events (push, PR, schedule). Installed once. |
+| GitHub service connection (`github.com_<owner>`) | Azure DevOps | The credential the pipeline authenticates through to reach GitHub. Created automatically by the app. |
+| Pipeline | Azure DevOps | Points at a YAML file in GitHub, then clones the repo and runs build / test / deploy. |
 
 ### Run sequence
 
 1. A developer pushes a commit or opens a PR in the GitHub repository.
-2. The Azure Pipelines GitHub App detects the event and calls the matching pipeline definition in Azure DevOps. Which event fires depends on the YAML `trigger` / `pr` / `schedules`.
-3. The build agent authenticates through the GitHub service connection, which supplies a token to clone the repo and read the YAML.
-4. The agent runs the pipeline steps defined in the YAML.
-5. The agent reports status back to GitHub, so the commit or PR shows a pass/fail check.
+2. GitHub notifies the Azure Pipelines GitHub App of the push or pull request.
+3. The app triggers the matching pipeline in Azure DevOps. Which event fires depends on the YAML `trigger` / `pr` / `schedules`.
+4. The pipeline authenticates through the GitHub service connection, which holds the app credential.
+5. Using that credential, the agent clones the repository and reads the YAML.
+6. The pipeline reports build status back to GitHub as a commit or PR check.
 
 ## Before you start
 
@@ -70,8 +56,6 @@ Confirm these roles. Sources are official Microsoft Learn and GitHub docs (see [
 | Create / view the service connection | Azure DevOps | Endpoint Administrator on the connection, or member of Project Administrators (created automatically by the app install) |
 | Use the service connection in a pipeline | Azure DevOps | User role on the service connection |
 | Create the pipeline | Azure DevOps | Create build pipeline = Allow — granted to Contributors, Build Administrators, or Project Administrators. Requires Basic access level (not Stakeholder) |
-
-You also need the Azure CLI with the `azure-devops` extension installed.
 
 > **Note:** A Project Administrator in Azure DevOps who is also a GitHub organization owner (or repo admin) has everything needed for the full flow.
 
