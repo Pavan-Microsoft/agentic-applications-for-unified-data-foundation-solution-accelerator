@@ -2,7 +2,7 @@
 
 **Playwright Test Orchestrator** is a VS Code Copilot agent that automates end-to-end Playwright test generation and execution. It uses three subagents — **Planner, Generator, Healer** — and a **`repo-scenario-discovery`** skill that scans the repo for sample questions and scenarios/use cases before planning. The subagents can also be used independently.
 
-> **Note:** These agents are meant to be copied into **the target repository you want to generate tests for**, and then run from that repo in VS Code. The examples below assume you have opened that target repo in VS Code.
+> **Note:** These agents are meant to be copied into the target repository you want to generate tests
 
 ## Prerequisites
 
@@ -16,13 +16,13 @@ npx playwright init-agents --loop=vscode
 You also need:
 
 - Node.js 20+
-- VS Code with GitHub Copilot Chat (agent mode enabled)
+- VS Code with GitHub Copilot Chat
 - A running web app for that repo (local or deployed) with a reachable URL
 
 ## Setup instructions
 
 1. Open the **target repo** (the app you want tests for) in VS Code.
-2. Copy `playwright-test-orchestrator.agent.md` from `.github/agents/` in this repo into `.github/agents/` of the target repo. Also copy `.github/skills/repo-scenario-discovery/` into the target repo so the planner can auto-detect scenarios and sample questions. (The planner, generator, and healer subagents are added automatically by the `npx playwright init-agents` command below.)
+2. Copy `playwright-test-orchestrator.agent.md` from `.github/agents/` into `.github/agents/` of the target repo. Also copy `.github/skills/repo-scenario-discovery/` into the target repo so the planner can auto-detect scenarios and sample questions. (The planner, generator, and healer subagents are added automatically by the `npx playwright init-agents` command below.)
 3. Run the two Prerequisites commands above **inside the target repo**.
 4. Start the **`playwright-test` MCP server**: open `.vscode/mcp.json` (created by the init-agents command) and click **Start** above the `playwright-test` entry. The subagents rely on it for browser automation.
 
@@ -86,6 +86,7 @@ use: {
 
 ## Known limitations / issues
 
+- **Authentication support** — currently, the orchestrator works only with unauthenticated URLs. Support for authenticated URLs is planned for a future update.
 - **Sequential execution within a run** — when the orchestrator runs, plan / generate / heal stages execute one after another (never in parallel) because they share a browser session. The subagents themselves can still be invoked independently outside the orchestrator.
 - **One generator call per test case** — large plans take time.
 - **Healer fallback** — tests that cannot be reliably fixed are marked with `test.fixme()` rather than deleted.
@@ -99,7 +100,10 @@ use: {
 4. Enter the following prompt:
 
    ```
-   Explore the web app https://samplewebapp.com and generate one sample test
+   Go to https://app-mv403b4qbg.azurewebsites.net ignore.
+   and Create test plan and generate test case to check whether character count reflecting as per typed message in text box.
+   Just focus on above test case only.
+   ignore scenario skill as of now
    ```
 5. If the app has multiple scenarios, tell the agent which one is currently loaded when it asks.
 
