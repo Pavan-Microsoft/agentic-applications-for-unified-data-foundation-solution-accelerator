@@ -63,13 +63,15 @@ param workloadProfileName string?
 // ============================================================================
 // Resource Deployment
 // ===========================================================================
-var ingressConfig = disableIngress ? null : {
-  external: ingressExternal
-  targetPort: ingressTargetPort
-  transport: ingressTransport
-  allowInsecure: ingressAllowInsecure
-  corsPolicy: !empty(corsPolicy) ? corsPolicy : null
-}
+var ingressConfig = disableIngress
+  ? null
+  : {
+      external: ingressExternal
+      targetPort: ingressTargetPort
+      transport: ingressTransport
+      allowInsecure: ingressAllowInsecure
+      corsPolicy: !empty(corsPolicy) ? corsPolicy : null
+    }
 
 resource containerApp 'Microsoft.App/containerApps@2024-10-02-preview' = {
   name: name
@@ -109,4 +111,7 @@ output resourceId string = containerApp.id
 output fqdn string = !disableIngress ? containerApp.properties.configuration.ingress.fqdn : ''
 
 @description('System-assigned identity principal ID.')
-output principalId string = contains(containerApp.identity.type, 'SystemAssigned') ? containerApp.identity.principalId : ''
+output principalId string = contains(containerApp.identity.type, 'SystemAssigned')
+  ? containerApp.identity.principalId
+  : ''
+

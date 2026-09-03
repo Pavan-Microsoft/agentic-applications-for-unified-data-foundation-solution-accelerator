@@ -52,7 +52,7 @@ resource cosmos 'Microsoft.DocumentDB/databaseAccounts@2025-10-15' = {
     enableAutomaticFailover: false
     enableMultipleWriteLocations: false
     disableLocalAuth: true
-    capabilities: [ { name: 'EnableServerless' } ]
+    capabilities: [{ name: 'EnableServerless' }]
   }
 }
 
@@ -63,16 +63,18 @@ resource database 'Microsoft.DocumentDB/databaseAccounts/sqlDatabases@2025-10-15
     resource: { id: databaseName }
   }
 
-  resource list 'containers' = [for container in containers: {
-    name: container.name
-    properties: {
-      resource: {
-        id: container.name
-        partitionKey: { paths: [ container.partitionKeyPath ] }
+  resource list 'containers' = [
+    for container in containers: {
+      name: container.name
+      properties: {
+        resource: {
+          id: container.name
+          partitionKey: { paths: [container.partitionKeyPath] }
+        }
+        options: {}
       }
-      options: {}
     }
-  }]
+  ]
 }
 
 // ============================================================================
@@ -92,3 +94,4 @@ output databaseName string = databaseName
 
 @description('Container name (first container).')
 output containerName string = containers[0].name
+

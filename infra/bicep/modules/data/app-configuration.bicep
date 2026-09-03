@@ -46,13 +46,15 @@ resource appConfiguration 'Microsoft.AppConfiguration/configurationStores@2023-0
   }
 }
 
-resource configurationKeyValues 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = [for keyValue in keyValues: {
-  name: keyValue.name
-  parent: appConfiguration
-  properties: {
-    value: keyValue.value
+resource configurationKeyValues 'Microsoft.AppConfiguration/configurationStores/keyValues@2023-03-01' = [
+  for keyValue in keyValues: {
+    name: keyValue.name
+    parent: appConfiguration
+    properties: {
+      value: keyValue.value
+    }
   }
-}]
+]
 
 // ============================================================================
 // Outputs
@@ -65,3 +67,4 @@ output endpoint string = appConfiguration.properties.endpoint
 
 @description('The resource ID of the App Configuration store.')
 output resourceId string = appConfiguration.id
+

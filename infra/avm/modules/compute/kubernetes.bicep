@@ -102,7 +102,9 @@ param managedIdentities object = { systemAssigned: true }
 var effectiveDnsPrefix = !empty(dnsPrefix) ? dnsPrefix : name
 var enableMonitoring = !empty(logAnalyticsWorkspaceResourceId)
 
-var effectiveAgentPools = [for pool in agentPools: union(pool, !empty(agentPoolSubnetId) ? { vnetSubnetResourceId: agentPoolSubnetId } : {})]
+var effectiveAgentPools = [
+  for pool in agentPools: union(pool, !empty(agentPoolSubnetId) ? { vnetSubnetResourceId: agentPoolSubnetId } : {})
+]
 
 // ============================================================================
 // AVM Module Deployment
@@ -136,14 +138,16 @@ module aksCluster 'br/public:avm/res/container-service/managed-cluster:0.13.1' =
     omsAgentEnabled: enableMonitoring
     monitoringWorkspaceResourceId: enableMonitoring ? logAnalyticsWorkspaceResourceId : null
     diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
-    securityProfile: enableDefender && enableMonitoring ? {
-      defender: {
-        logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceResourceId
-        securityMonitoring: {
-          enabled: true
+    securityProfile: enableDefender && enableMonitoring
+      ? {
+          defender: {
+            logAnalyticsWorkspaceResourceId: logAnalyticsWorkspaceResourceId
+            securityMonitoring: {
+              enabled: true
+            }
+          }
         }
-      }
-    } : {}
+      : {}
     roleAssignments: roleAssignments
   }
 }
@@ -165,3 +169,4 @@ output kubeletIdentityObjectId string = aksCluster.outputs.?kubeletIdentityObjec
 
 @description('Principal ID of the AKS control-plane system-assigned managed identity.')
 output systemAssignedMIPrincipalId string = aksCluster.outputs.?systemAssignedMIPrincipalId ?? ''
+

@@ -82,3 +82,4 @@ output resourceId string = maintenanceConfiguration.outputs.resourceId
 
 @description('Name of the maintenance configuration.')
 output name string = maintenanceConfiguration.outputs.name
+

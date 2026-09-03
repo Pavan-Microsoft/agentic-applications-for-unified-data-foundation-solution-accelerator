@@ -117,3 +117,4 @@ output serverResourceId string = sqlServer.id
 
 @description('Name of the SQL Server.')
 output name string = sqlServer.name
+

@@ -204,10 +204,20 @@ param appTitleSecondary string = '| Unified Data Analysis Agents'
 // Variables
 // ============================================================================
 
-var solutionSuffix = toLower(trim(replace(replace(replace(replace(replace(replace('${solutionName}${solutionUniqueText}', '-', ''), '_', ''), '.', ''), '/', ''), ' ', ''), '*', '')))
+var solutionSuffix = toLower(trim(replace(
+  replace(
+    replace(replace(replace(replace('${solutionName}${solutionUniqueText}', '-', ''), '_', ''), '.', ''), '/', ''),
+    ' ',
+    ''
+  ),
+  '*',
+  ''
+)))
 
 // Container Registry: per-deployment ACR name (registry names: alphanumeric, 5-50 chars)
-var containerRegistryResourceName = !empty(containerRegistryName) ? containerRegistryName : take('cr${solutionSuffix}', 50)
+var containerRegistryResourceName = !empty(containerRegistryName)
+  ? containerRegistryName
+  : take('cr${solutionSuffix}', 50)
 
 // Public placeholder image used at provision time. App Services start on this
 // image; the separate post-deployment script (infra/scripts/build/build-and-push-acr.*)
@@ -215,7 +225,9 @@ var containerRegistryResourceName = !empty(containerRegistryName) ? containerReg
 var placeholderContainerImage = 'DOCKER|mcr.microsoft.com/azuredocs/aci-helloworld:latest'
 var deployerInfo = deployer()
 var deployingUserPrincipalId = deployerInfo.objectId
-var createdBy = contains(deployerInfo, 'userPrincipalName') ? split(deployerInfo.userPrincipalName, '@')[0] : deployerInfo.objectId
+var createdBy = contains(deployerInfo, 'userPrincipalName')
+  ? split(deployerInfo.userPrincipalName, '@')[0]
+  : deployerInfo.objectId
 var useExistingAIProject = !empty(existingFoundryProjectResourceId)
 var useChatHistoryEnabledSetting = useChatHistoryEnabled ? 'True' : 'False'
 var useUserAccessTokenSetting = useUserAccessToken ? 'True' : 'False'
@@ -291,7 +303,7 @@ var dnsZoneIndex = {
   blob: 4
   search: 5
   sqlServer: 6
-  webApp : 7
+  webApp: 7
   containerRegistry: 8
 }
 
@@ -368,23 +380,25 @@ module log_analytics './modules/monitoring/log-analytics.bicep' = if (enableMoni
     enableReplication: enableRedundancy
     replicationLocation: enableRedundancy ? replicaLocation : ''
     dailyQuotaGb: enableRedundancy ? '150' : ''
-    dataSources: enablePrivateNetworking ? [
-      {
-        tags: tags
-        eventLogName: 'Application'
-        eventTypes: [{ eventType: 'Error' }, { eventType: 'Warning' }, { eventType: 'Information' }]
-        kind: 'WindowsEvent'
-        name: 'applicationEvent'
-      }
-      {
-        counterName: '% Processor Time'
-        instanceName: '*'
-        intervalSeconds: 60
-        kind: 'WindowsPerformanceCounter'
-        name: 'windowsPerfCounter1'
-        objectName: 'Processor'
-      }
-    ] : []
+    dataSources: enablePrivateNetworking
+      ? [
+          {
+            tags: tags
+            eventLogName: 'Application'
+            eventTypes: [{ eventType: 'Error' }, { eventType: 'Warning' }, { eventType: 'Information' }]
+            kind: 'WindowsEvent'
+            name: 'applicationEvent'
+          }
+          {
+            counterName: '% Processor Time'
+            instanceName: '*'
+            intervalSeconds: 60
+            kind: 'WindowsPerformanceCounter'
+            name: 'windowsPerfCounter1'
+            objectName: 'Processor'
+          }
+        ]
+      : []
   }
 }
 
@@ -506,16 +520,18 @@ module virtualMachine './modules/compute/virtual-machine.bicep' = if (enablePriv
     diagnosticSettings: enableMonitoring ? [{ workspaceResourceId: logAnalyticsWorkspaceResourceId }] : null
     maintenanceConfigurationResourceId: maintenanceConfiguration!.outputs.resourceId
     proximityPlacementGroupResourceId: proximityPlacementGroup!.outputs.resourceId
-    extensionMonitoringAgentConfig: enableMonitoring ? {
-      dataCollectionRuleAssociations: [
-        {
-          dataCollectionRuleResourceId: windowsVmDataCollectionRules!.outputs.resourceId
-          name: 'send-${logAnalyticsWorkspaceName}'
+    extensionMonitoringAgentConfig: enableMonitoring
+      ? {
+          dataCollectionRuleAssociations: [
+            {
+              dataCollectionRuleResourceId: windowsVmDataCollectionRules!.outputs.resourceId
+              name: 'send-${logAnalyticsWorkspaceName}'
+            }
+          ]
+          enabled: true
+          tags: tags
         }
-      ]
-      enabled: true
-      tags: tags
-    } : null
+      : null
   }
 }
 
@@ -651,19 +667,21 @@ module foundry_appi_connection './modules/ai/ai-foundry-connection.bicep' = if (
 
 // Model deployments (single loop for both existing and new paths)
 @batchSize(1)
-module model_deployments './modules/ai/ai-foundry-model-deployment.bicep' = [for (deployment, i) in aiModelDeployments: {
-  name: take('module.model-deployment-${i}.${solutionName}', 64)
-  scope: resourceGroup(aiFoundrySubscriptionId, aiFoundryResourceGroupName)
-  params: {
-    aiServicesAccountName: aiFoundryResourceName
-    deploymentName: deployment.name
-    modelName: deployment.model
-    modelVersion: deployment.version
-    raiPolicyName: deployment.raiPolicyName
-    skuName: deployment.sku.name
-    skuCapacity: deployment.sku.capacity
+module model_deployments './modules/ai/ai-foundry-model-deployment.bicep' = [
+  for (deployment, i) in aiModelDeployments: {
+    name: take('module.model-deployment-${i}.${solutionName}', 64)
+    scope: resourceGroup(aiFoundrySubscriptionId, aiFoundryResourceGroupName)
+    params: {
+      aiServicesAccountName: aiFoundryResourceName
+      deploymentName: deployment.name
+      modelName: deployment.model
+      modelVersion: deployment.version
+      raiPolicyName: deployment.raiPolicyName
+      skuName: deployment.sku.name
+      skuCapacity: deployment.sku.capacity
+    }
   }
-}]
+]
 
 // Separate PE for AI Foundry to avoid AccountProvisioningStateInvalid race condition
 // module aifoundry_private_endpoint './modules/networking/private-endpoint.bicep' = if (!useExistingAIProject && enablePrivateNetworking) {
@@ -703,12 +721,22 @@ module model_deployments './modules/ai/ai-foundry-model-deployment.bicep' = [for
 // }
 
 // ========== AI outputs (ternary: existing vs new) ========== //
-var aiFoundryEndpoint = useExistingAIProject ? existing_project_setup!.outputs.endpoint : ai_foundry_project!.outputs.endpoint
-var projectEndpoint = useExistingAIProject ? existing_project_setup!.outputs.projectEndpoint : ai_foundry_project!.outputs.projectEndpoint
+var aiFoundryEndpoint = useExistingAIProject
+  ? existing_project_setup!.outputs.endpoint
+  : ai_foundry_project!.outputs.endpoint
+var projectEndpoint = useExistingAIProject
+  ? existing_project_setup!.outputs.projectEndpoint
+  : ai_foundry_project!.outputs.projectEndpoint
 var aiFoundryName = useExistingAIProject ? existing_project_setup!.outputs.name : ai_foundry_project!.outputs.name
-var aiProjectName = useExistingAIProject ? existing_project_setup!.outputs.projectName : ai_foundry_project!.outputs.projectName
-var aiFoundryResourceId = useExistingAIProject ? existing_project_setup!.outputs.resourceId : ai_foundry_project!.outputs.resourceId
-var aiProjectPrincipalId = useExistingAIProject ? existing_project_setup!.outputs.projectIdentityPrincipalId : ai_foundry_project!.outputs.projectIdentityPrincipalId
+var aiProjectName = useExistingAIProject
+  ? existing_project_setup!.outputs.projectName
+  : ai_foundry_project!.outputs.projectName
+var aiFoundryResourceId = useExistingAIProject
+  ? existing_project_setup!.outputs.resourceId
+  : ai_foundry_project!.outputs.resourceId
+var aiProjectPrincipalId = useExistingAIProject
+  ? existing_project_setup!.outputs.projectIdentityPrincipalId
+  : ai_foundry_project!.outputs.projectIdentityPrincipalId
 var aiSearchConnectionId = foundry_search_connection.outputs.connectionId
 
 module ai_search './modules/ai/ai-search.bicep' = {
@@ -763,9 +791,11 @@ module storage_account './modules/data/storage-account.bicep' = {
     ]
     enablePrivateNetworking: enablePrivateNetworking
     privateEndpointSubnetId: enablePrivateNetworking ? virtualNetwork!.outputs.backendSubnetResourceId : ''
-    privateDnsZoneResourceIds: enablePrivateNetworking ? [
-      privateDnsZoneDeployments[dnsZoneIndex.blob]!.outputs.resourceId
-    ] : []
+    privateDnsZoneResourceIds: enablePrivateNetworking
+      ? [
+          privateDnsZoneDeployments[dnsZoneIndex.blob]!.outputs.resourceId
+        ]
+      : []
   }
 }
 
@@ -787,9 +817,11 @@ module cosmosDBModule './modules/data/cosmos-db-nosql.bicep' = {
     haLocation: cosmosDbHaLocation
     enablePrivateNetworking: enablePrivateNetworking
     privateEndpointSubnetId: enablePrivateNetworking ? virtualNetwork!.outputs.backendSubnetResourceId : ''
-    privateDnsZoneResourceIds: enablePrivateNetworking ? [
-      privateDnsZoneDeployments[dnsZoneIndex.cosmosDb]!.outputs.resourceId
-    ] : []
+    privateDnsZoneResourceIds: enablePrivateNetworking
+      ? [
+          privateDnsZoneDeployments[dnsZoneIndex.cosmosDb]!.outputs.resourceId
+        ]
+      : []
   }
 }
 
@@ -813,9 +845,11 @@ module containerRegistry './modules/compute/container-registry.bicep' = {
     exportPolicyStatus: enablePrivateNetworking ? 'disabled' : 'enabled'
     enablePrivateNetworking: enablePrivateNetworking
     privateEndpointSubnetId: enablePrivateNetworking ? virtualNetwork!.outputs.backendSubnetResourceId : ''
-    privateDnsZoneResourceIds: enablePrivateNetworking ? [
-      privateDnsZoneDeployments[dnsZoneIndex.containerRegistry]!.outputs.resourceId
-    ] : []
+    privateDnsZoneResourceIds: enablePrivateNetworking
+      ? [
+          privateDnsZoneDeployments[dnsZoneIndex.containerRegistry]!.outputs.resourceId
+        ]
+      : []
   }
 }
 
@@ -858,19 +892,21 @@ module backend_docker './modules/compute/app-service.bicep' = if (backendRuntime
     vnetRouteAllEnabled: enablePrivateNetworking ? true : false
     imagePullTraffic: enablePrivateNetworking ? true : false
     contentShareTraffic: enablePrivateNetworking ? true : false
-    privateEndpoints: enablePrivateNetworking ? [
-      {
-        name: 'pep-apipy-${solutionSuffix}'
-        customNetworkInterfaceName: 'nic-api-${solutionSuffix}'
-        subnetResourceId: virtualNetwork!.outputs.backendSubnetResourceId
-        service: 'sites'
-        privateDnsZoneGroup: {
+    privateEndpoints: enablePrivateNetworking
+      ? [
+          {
+            name: 'pep-apipy-${solutionSuffix}'
+            customNetworkInterfaceName: 'nic-api-${solutionSuffix}'
+            subnetResourceId: virtualNetwork!.outputs.backendSubnetResourceId
+            service: 'sites'
+            privateDnsZoneGroup: {
               privateDnsZoneGroupConfigs: [
                 { privateDnsZoneResourceId: privateDnsZoneDeployments[dnsZoneIndex.webApp]!.outputs.resourceId }
               ]
             }
-      }
-    ] : []
+          }
+        ]
+      : []
     diagnosticSettings: monitoringDiagnosticSettings
     appSettings: {
       AZURE_ENV_GPT_MODEL_NAME: gptModelName
@@ -928,19 +964,21 @@ module backend_csapi_docker './modules/compute/app-service.bicep' = if (backendR
     vnetRouteAllEnabled: enablePrivateNetworking ? true : false
     imagePullTraffic: enablePrivateNetworking ? true : false
     contentShareTraffic: enablePrivateNetworking ? true : false
-    privateEndpoints: enablePrivateNetworking ? [
-      {
-        name: 'pep-apics-${solutionSuffix}'
-        customNetworkInterfaceName: 'nic-api-${solutionSuffix}'
-        subnetResourceId: virtualNetwork!.outputs.backendSubnetResourceId
-        service: 'sites'
-        privateDnsZoneGroup: {
+    privateEndpoints: enablePrivateNetworking
+      ? [
+          {
+            name: 'pep-apics-${solutionSuffix}'
+            customNetworkInterfaceName: 'nic-api-${solutionSuffix}'
+            subnetResourceId: virtualNetwork!.outputs.backendSubnetResourceId
+            service: 'sites'
+            privateDnsZoneGroup: {
               privateDnsZoneGroupConfigs: [
                 { privateDnsZoneResourceId: privateDnsZoneDeployments[dnsZoneIndex.webApp]!.outputs.resourceId }
               ]
             }
-      }
-    ] : []
+          }
+        ]
+      : []
     diagnosticSettings: monitoringDiagnosticSettings
     appSettings: {
       AZURE_ENV_GPT_MODEL_NAME: gptModelName
@@ -996,7 +1034,11 @@ module frontend_docker './modules/compute/app-service.bicep' = {
     diagnosticSettings: monitoringDiagnosticSettings
     appSettings: {
       APP_API_BASE_URL: enablePrivateNetworking ? '' : apiBaseUrl
-      BACKEND_API_HOST: enablePrivateNetworking ? backendRuntimeStack == 'python' ? 'api-${solutionSuffix}.azurewebsites.net' : 'api-cs-${solutionSuffix}.azurewebsites.net' : ''
+      BACKEND_API_HOST: enablePrivateNetworking
+        ? backendRuntimeStack == 'python'
+            ? 'api-${solutionSuffix}.azurewebsites.net'
+            : 'api-cs-${solutionSuffix}.azurewebsites.net'
+        : ''
       CHAT_LANDING_TEXT: ''
       APP_TITLE_PRIMARY: appTitlePrimary
       APP_TITLE_SECONDARY: appTitleSecondary
@@ -1018,7 +1060,9 @@ module role_assignments './modules/identity/role-assignments.bicep' = {
     aiSearchResourceId: ai_search.outputs.resourceId
     storageAccountResourceId: storage_account.outputs.resourceId
     cosmosDbAccountName: cosmosDBModule.outputs.name
-    backendAppServicePrincipalId: (backendRuntimeStack == 'python' ? backend_docker!.outputs.identityPrincipalId : backend_csapi_docker!.outputs.identityPrincipalId)
+    backendAppServicePrincipalId: (backendRuntimeStack == 'python'
+      ? backend_docker!.outputs.identityPrincipalId
+      : backend_csapi_docker!.outputs.identityPrincipalId)
     frontendAppServicePrincipalId: frontend_docker.outputs.identityPrincipalId
     containerRegistryResourceId: containerRegistry.outputs.resourceId
     aiFoundryResourceId: aiFoundryResourceId
@@ -1080,13 +1124,19 @@ output AZURE_AI_AGENT_ENDPOINT string = projectEndpoint
 output AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME string = gptModelName
 
 @description('Backend API App Service name.')
-output API_APP_NAME string = backendRuntimeStack == 'python' ? backend_docker!.outputs.name : backend_csapi_docker!.outputs.name
+output API_APP_NAME string = backendRuntimeStack == 'python'
+  ? backend_docker!.outputs.name
+  : backend_csapi_docker!.outputs.name
 
 @description('Backend API managed identity principal ID.')
-output API_PID string = backendRuntimeStack == 'python' ? backend_docker!.outputs.identityPrincipalId : backend_csapi_docker!.outputs.identityPrincipalId
+output API_PID string = backendRuntimeStack == 'python'
+  ? backend_docker!.outputs.identityPrincipalId
+  : backend_csapi_docker!.outputs.identityPrincipalId
 
 @description('Backend API managed identity display name.')
-output MID_DISPLAY_NAME string = backendRuntimeStack == 'python' ? backend_docker!.outputs.name : backend_csapi_docker!.outputs.name
+output MID_DISPLAY_NAME string = backendRuntimeStack == 'python'
+  ? backend_docker!.outputs.name
+  : backend_csapi_docker!.outputs.name
 
 @description('Frontend web app resource name.')
 output WEB_APP_NAME string = frontend_docker.outputs.name

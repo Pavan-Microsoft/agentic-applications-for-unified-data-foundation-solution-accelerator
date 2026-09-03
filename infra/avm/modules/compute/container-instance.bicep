@@ -118,3 +118,4 @@ output resourceId string = containerGroup.outputs.resourceId
 
 @description('The IP address of the container group.')
 output ipAddress string = containerGroup.outputs.?iPv4Address ?? ''
+

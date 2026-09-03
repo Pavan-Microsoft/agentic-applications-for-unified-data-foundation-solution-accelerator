@@ -83,3 +83,4 @@ output resourceId string = bastionHost.outputs.resourceId
 
 @description('Name of the Bastion Host.')
 output name string = bastionHost.outputs.name
+

@@ -70,10 +70,12 @@ module workspace 'br/public:avm/res/operational-insights/workspace:0.15.0' = {
     publicNetworkAccessForIngestion: publicNetworkAccessForIngestion
     publicNetworkAccessForQuery: publicNetworkAccessForQuery
     dailyQuotaGb: !empty(dailyQuotaGb) ? dailyQuotaGb : null
-    replication: enableReplication ? {
-      enabled: true
-      location: replicationLocation
-    } : null
+    replication: enableReplication
+      ? {
+          enabled: true
+          location: replicationLocation
+        }
+      : null
     dataSources: !empty(dataSources) ? dataSources : null
   }
 }
@@ -92,3 +94,4 @@ output location string = location
 
 @description('Log Analytics workspace customer ID.')
 output logAnalyticsWorkspaceId string = workspace.outputs.logAnalyticsWorkspaceId
+

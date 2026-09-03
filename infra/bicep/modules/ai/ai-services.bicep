@@ -86,3 +86,4 @@ output endpoint string = aiService.properties.endpoint
 
 @description('System-assigned identity principal ID.')
 output identityPrincipalId string = aiService.identity.principalId
+

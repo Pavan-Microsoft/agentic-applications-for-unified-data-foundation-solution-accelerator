@@ -60,10 +60,12 @@ param privateDnsZoneResourceIds array = []
 @description('Optional. Managed identities for the resource.')
 param managedIdentities object = { systemAssigned: true }
 
-var privateDnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
-  name: 'dns-zone-${i}'
-  privateDnsZoneResourceId: zoneId
-}]
+var privateDnsZoneConfigs = [
+  for (zoneId, i) in privateDnsZoneResourceIds: {
+    name: 'dns-zone-${i}'
+    privateDnsZoneResourceId: zoneId
+  }
+]
 
 // ============================================================================
 // AVM Module Deployment
@@ -102,29 +104,33 @@ module sqlServer 'br/public:avm/res/sql/server:0.21.1' = {
         }
       }
     ]
-    firewallRules: publicNetworkAccess == 'Enabled' ? [
-      {
-        name: 'AllowSpecificRange'
-        startIpAddress: '0.0.0.0'
-        endIpAddress: '255.255.255.255'
-      }
-      {
-        name: 'AllowAllWindowsAzureIps'
-        startIpAddress: '0.0.0.0'
-        endIpAddress: '0.0.0.0'
-      }
-    ] : []
-    privateEndpoints: enablePrivateNetworking ? [
-      {
-        name: 'pep-${name}'
-        customNetworkInterfaceName: 'nic-${name}'
-        subnetResourceId: privateEndpointSubnetId
-        service: 'sqlServer'
-        privateDnsZoneGroup: {
-          privateDnsZoneGroupConfigs: privateDnsZoneConfigs
-        }
-      }
-    ] : []
+    firewallRules: publicNetworkAccess == 'Enabled'
+      ? [
+          {
+            name: 'AllowSpecificRange'
+            startIpAddress: '0.0.0.0'
+            endIpAddress: '255.255.255.255'
+          }
+          {
+            name: 'AllowAllWindowsAzureIps'
+            startIpAddress: '0.0.0.0'
+            endIpAddress: '0.0.0.0'
+          }
+        ]
+      : []
+    privateEndpoints: enablePrivateNetworking
+      ? [
+          {
+            name: 'pep-${name}'
+            customNetworkInterfaceName: 'nic-${name}'
+            subnetResourceId: privateEndpointSubnetId
+            service: 'sqlServer'
+            privateDnsZoneGroup: {
+              privateDnsZoneGroupConfigs: privateDnsZoneConfigs
+            }
+          }
+        ]
+      : []
   }
 }
 
@@ -142,3 +148,4 @@ output serverResourceId string = sqlServer.outputs.resourceId
 
 @description('Name of the SQL Server.')
 output name string = sqlServer.outputs.name
+

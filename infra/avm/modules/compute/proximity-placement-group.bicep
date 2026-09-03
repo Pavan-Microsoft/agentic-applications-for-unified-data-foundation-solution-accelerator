@@ -49,3 +49,4 @@ output resourceId string = proximityPlacementGroup.outputs.resourceId
 
 @description('Name of the proximity placement group.')
 output name string = proximityPlacementGroup.outputs.name
+

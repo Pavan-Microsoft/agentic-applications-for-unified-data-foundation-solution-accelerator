@@ -68,3 +68,4 @@ output defaultDomain string = containerAppEnvironment.properties.defaultDomain
 
 @description('The static IP address of the Container Apps Environment.')
 output staticIp string = containerAppEnvironment.properties.staticIp
+

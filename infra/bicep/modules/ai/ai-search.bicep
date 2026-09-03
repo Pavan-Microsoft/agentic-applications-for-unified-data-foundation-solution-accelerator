@@ -103,3 +103,4 @@ output endpoint string = 'https://${aiSearch.name}.search.windows.net'
 
 @description('System-assigned identity principal ID.')
 output identityPrincipalId string = searchServiceUpdate.outputs.systemAssignedMIPrincipalId
+

@@ -112,3 +112,4 @@ output resourceId string = containerGroup.id
 
 @description('The IP address of the container group.')
 output ipAddress string = containerGroup.properties.ipAddress.ip
+

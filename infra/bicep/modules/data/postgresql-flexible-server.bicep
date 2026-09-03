@@ -135,3 +135,4 @@ output name string = postgresServer.name
 
 @description('The resource ID of the PostgreSQL Flexible Server.')
 output resourceId string = postgresServer.id
+
