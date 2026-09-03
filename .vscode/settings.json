@@ -1,0 +1,8 @@
+{
+    "chat.agentHost.agentDebugLog.enabled": true,
+    "github.copilot.chat.agentDebugLog.fileLogging.enabled": true,
+    "chat.agentFilesLocations": {
+        ".github/agents": true,
+        ".github/agents/unit-test-subagents": true
+    }
+}

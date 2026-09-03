@@ -1,222 +1,314 @@
-"""
-Unit tests for auth_utils.py module with 95%+ coverage.
+"""Unit tests for src/api/python/auth/auth_utils.py.
+
+The module is pure header/JSON parsing, so the only "external" dependencies are
+the request-header mapping and the ``sample_user`` development fixture, both of
+which are supplied directly by the tests. No network, Azure or file-system
+access occurs.
 """
 
 import base64
 import json
-from unittest.mock import patch
+import logging
 
-from auth.auth_utils import get_authenticated_user_details, get_tenantid
+import pytest
+
+from auth import auth_utils
 
 
-class TestGetAuthenticatedUserDetails:
-    """Tests for get_authenticated_user_details function."""
+# --------------------------------------------------------------------------- #
+# Helpers
+# --------------------------------------------------------------------------- #
 
-    def test_with_easyauth_headers(self):
-        """Test extracting authenticated user details with EasyAuth headers."""
-        headers = {
-            "X-Ms-Client-Principal-Id": "user-123",
-            "X-Ms-Client-Principal-Name": "user@example.com",
-            "X-Ms-Client-Principal-Idp": "aad",
-            "X-Ms-Token-Aad-Id-Token": "token123",
-            "X-Ms-Client-Principal": "base64principal",
+
+PRINCIPAL_ID = "11111111-2222-3333-4444-555555555555"
+
+
+def easyauth_headers(**overrides):
+    """Canonical EasyAuth header set, with per-test overrides."""
+    headers = {
+        "x-ms-client-principal-id": PRINCIPAL_ID,
+        "x-ms-client-principal-name": "ada@contoso.com",
+        "x-ms-client-principal-idp": "aad",
+        "x-ms-client-principal": "eyJ0aWQiOiAidGVuYW50In0=",
+        "x-ms-token-aad-id-token": "id-token-value",
+    }
+    headers.update(overrides)
+    return {key: value for key, value in headers.items() if value is not None}
+
+
+def b64_principal(payload):
+    return base64.b64encode(json.dumps(payload).encode("utf-8")).decode("utf-8")
+
+
+# --------------------------------------------------------------------------- #
+# get_authenticated_user_details - identity mapping
+# --------------------------------------------------------------------------- #
+
+
+def test_maps_every_easyauth_header_to_its_user_object_field():
+    user = auth_utils.get_authenticated_user_details(easyauth_headers())
+
+    assert user["user_principal_id"] == PRINCIPAL_ID
+    assert user["user_name"] == "ada@contoso.com"
+    assert user["auth_provider"] == "aad"
+    assert user["auth_token"] == "id-token-value"
+    assert user["aad_id_token"] == "id-token-value"
+    assert user["client_principal_b64"] == "eyJ0aWQiOiAidGVuYW50In0="
+
+
+def test_returns_exactly_the_seven_documented_user_object_keys():
+    user = auth_utils.get_authenticated_user_details(easyauth_headers())
+
+    assert set(user) == {
+        "user_principal_id",
+        "user_name",
+        "auth_provider",
+        "auth_token",
+        "client_principal_b64",
+        "aad_id_token",
+        "aad_access_token",
+    }
+
+
+def test_normalizes_mixed_case_header_names_before_lookup():
+    headers = {
+        "X-MS-CLIENT-PRINCIPAL-ID": PRINCIPAL_ID,
+        "X-Ms-Client-Principal-Name": "grace@contoso.com",
+        "X-Ms-Client-Principal-Idp": "github",
+        "X-Ms-Token-Aad-Id-Token": "mixed-case-id-token",
+    }
+
+    user = auth_utils.get_authenticated_user_details(headers)
+
+    assert user["user_principal_id"] == PRINCIPAL_ID
+    assert user["user_name"] == "grace@contoso.com"
+    assert user["auth_provider"] == "github"
+    assert user["aad_id_token"] == "mixed-case-id-token"
+
+
+def test_optional_headers_missing_yields_none_without_dropping_the_principal_id():
+    user = auth_utils.get_authenticated_user_details({"x-ms-client-principal-id": PRINCIPAL_ID})
+
+    assert user["user_principal_id"] == PRINCIPAL_ID
+    assert user["user_name"] is None
+    assert user["auth_provider"] is None
+    assert user["auth_token"] is None
+    assert user["aad_id_token"] is None
+    assert user["client_principal_b64"] is None
+
+
+# --------------------------------------------------------------------------- #
+# get_authenticated_user_details - development fallback
+# --------------------------------------------------------------------------- #
+
+
+def test_falls_back_to_the_sample_user_when_the_principal_header_is_absent():
+    user = auth_utils.get_authenticated_user_details({"host": "localhost:8000"})
+
+    assert user["user_principal_id"] == "00000000-0000-0000-0000-000000000000"
+    assert user["user_name"] == "testusername@constoso.com"
+    assert user["auth_provider"] == "aad"
+    assert user["aad_id_token"] == "your_aad_id_token"
+
+
+def test_fallback_ignores_unrelated_headers_instead_of_mixing_them_in():
+    user = auth_utils.get_authenticated_user_details(
+        {"x-ms-client-principal-name": "spoofed@contoso.com"}
+    )
+
+    assert user["user_name"] == "testusername@constoso.com"
+    assert user["user_principal_id"] == "00000000-0000-0000-0000-000000000000"
+
+
+def test_fallback_identity_still_honors_a_real_bearer_access_token():
+    user = auth_utils.get_authenticated_user_details({"authorization": "Bearer dev-obo-token"})
+
+    assert user["user_principal_id"] == "00000000-0000-0000-0000-000000000000"
+    assert user["aad_access_token"] == "dev-obo-token"
+
+
+def test_an_empty_header_mapping_uses_the_fallback_and_has_no_access_token():
+    user = auth_utils.get_authenticated_user_details({})
+
+    assert user["user_principal_id"] == "00000000-0000-0000-0000-000000000000"
+    assert user["aad_access_token"] is None
+
+
+# --------------------------------------------------------------------------- #
+# get_authenticated_user_details - access-token precedence chain
+# --------------------------------------------------------------------------- #
+
+
+def test_easyauth_access_token_wins_over_zumo_and_bearer():
+    headers = easyauth_headers(
+        **{
+            "x-ms-token-aad-access-token": "easyauth-token",
+            "x-zumo-auth": "zumo-token",
+            "authorization": "Bearer bearer-token",
         }
-        result = get_authenticated_user_details(headers)
+    )
 
-        # Headers are normalized to lowercase, so values are found
-        assert result["user_principal_id"] == "user-123"
-        assert result["user_name"] == "user@example.com"
-        assert result["auth_provider"] == "aad"
-        assert result["auth_token"] == "token123"
-        assert result["aad_id_token"] == "token123"
-        assert result["client_principal_b64"] == "base64principal"
-        assert result["aad_access_token"] is None
+    user = auth_utils.get_authenticated_user_details(headers)
 
-    def test_development_mode_without_principal_id(self):
-        """Test development mode when principal ID header is missing."""
-        headers = {"Content-Type": "application/json"}
-
-        # Import will happen and use actual sample_user from module
-        result = get_authenticated_user_details(headers)
-
-        # sample_user has capitalized headers, but get() uses lowercase keys
-        # Since sample_user has "X-Ms-Client-Principal-Id" and we call .get("x-ms-client-principal-id"),
-        # it returns None due to case sensitivity
-        assert "user_principal_id" in result
-        assert "user_name" in result
-
-    def test_case_insensitive_header_lookup(self):
-        """Test that header lookup for principal ID detection is case-insensitive."""
-        headers = {
-            "x-ms-client-principal-id": "user-456",
-            "x-ms-client-principal-name": "admin@test.com",
-        }
-        result = get_authenticated_user_details(headers)
-
-        # With lowercase keys in headers, .get() will find them
-        assert result["user_principal_id"] == "user-456"
-        assert result["user_name"] == "admin@test.com"
-
-    def test_partial_headers(self):
-        """Test with only some headers present."""
-        headers = {
-            "x-ms-client-principal-id": "user-789",
-        }
-        result = get_authenticated_user_details(headers)
-
-        assert result["user_principal_id"] == "user-789"
-        assert result["user_name"] is None
-        assert result["auth_provider"] is None
-
-    def test_empty_headers(self):
-        """Test with empty headers dictionary."""
-        headers = {}
-
-        # Will use sample_user module since no principal ID header
-        result = get_authenticated_user_details(headers)
-
-        # sample_user has capitalized headers, but the code does case-sensitive .get()
-        # so values will be None
-        assert "user_principal_id" in result
-        assert "user_name" in result
-        assert "auth_provider" in result
-        assert "aad_id_token" in result
-
-    def test_return_type(self):
-        """Test that function returns a dictionary."""
-        headers = {"X-Ms-Client-Principal-Id": "test"}
-        result = get_authenticated_user_details(headers)
-        assert isinstance(result, dict)
-
-    def test_all_expected_fields_present(self):
-        """Test that all expected fields are present in the result."""
-        headers = {"X-Ms-Client-Principal-Id": "test"}
-        result = get_authenticated_user_details(headers)
-
-        expected_fields = [
-            "user_principal_id",
-            "user_name",
-            "auth_provider",
-            "auth_token",
-            "client_principal_b64",
-            "aad_id_token",
-            "aad_access_token",
-        ]
-
-        for field in expected_fields:
-            assert field in result
+    assert user["aad_access_token"] == "easyauth-token"
 
 
-class TestGetTenantId:
-    """Tests for get_tenantid function."""
+def test_zumo_token_wins_over_bearer_when_easyauth_token_is_absent():
+    headers = easyauth_headers(
+        **{"x-zumo-auth": "zumo-token", "authorization": "Bearer bearer-token"}
+    )
 
-    def test_valid_base64_with_tid(self):
-        """Test extracting tenant ID from valid base64 encoded JSON."""
-        token_data = {"tid": "tenant-123", "aud": "app-id"}
-        encoded = base64.b64encode(json.dumps(token_data).encode()).decode()
+    user = auth_utils.get_authenticated_user_details(headers)
 
-        result = get_tenantid(encoded)
-        assert result == "tenant-123"
+    assert user["aad_access_token"] == "zumo-token"
 
-    def test_valid_base64_without_tid(self):
-        """Test base64 data without tid field."""
-        token_data = {"aud": "app-id", "sub": "user-123"}
-        encoded = base64.b64encode(json.dumps(token_data).encode()).decode()
 
-        result = get_tenantid(encoded)
-        assert result is None
+def test_bearer_token_is_used_when_it_is_the_only_source():
+    headers = easyauth_headers(**{"authorization": "Bearer bearer-token"})
 
-    def test_empty_string(self):
-        """Test with empty string."""
-        result = get_tenantid("")
-        assert result == ""
+    user = auth_utils.get_authenticated_user_details(headers)
 
-    def test_none_value(self):
-        """Test with None value."""
-        result = get_tenantid(None)
-        assert result == ""
+    assert user["aad_access_token"] == "bearer-token"
 
-    def test_invalid_base64(self):
-        """Test with invalid base64 string."""
-        result = get_tenantid("invalid!!!base64")
-        assert result == ""
 
-    def test_invalid_json(self):
-        """Test with valid base64 but invalid JSON."""
-        invalid_json = base64.b64encode(b"{invalid json}").decode()
-        result = get_tenantid(invalid_json)
-        assert result == ""
+def test_bearer_token_is_stripped_of_surrounding_whitespace():
+    headers = easyauth_headers(**{"authorization": "Bearer   padded-token   "})
 
-    def test_base64_with_padding(self):
-        """Test with base64 string that has padding."""
-        token_data = {"tid": "tenant-with-padding"}
-        encoded = base64.b64encode(json.dumps(token_data).encode()).decode()
+    user = auth_utils.get_authenticated_user_details(headers)
 
-        result = get_tenantid(encoded)
-        assert result == "tenant-with-padding"
+    assert user["aad_access_token"] == "padded-token"
 
-    def test_base64_without_padding(self):
-        """Test with base64 string without padding."""
-        token_data = {"tid": "tenant-no-pad"}
-        encoded = base64.b64encode(json.dumps(token_data).encode()).decode().rstrip("=")
 
-        # May fail or return empty string
-        result = get_tenantid(encoded)
-        assert isinstance(result, str)
+@pytest.mark.parametrize("scheme", ["Bearer", "bearer", "BEARER", "BeArEr"])
+def test_bearer_scheme_is_matched_case_insensitively(scheme):
+    headers = easyauth_headers(**{"authorization": f"{scheme} case-token"})
 
-    @patch("auth.auth_utils.logging")
-    def test_exception_logging(self, _mock_logging):
-        """Test that exceptions are logged."""
-        result = get_tenantid("invalid!!!base64")
-        assert result == ""
+    user = auth_utils.get_authenticated_user_details(headers)
 
-    def test_unicode_in_tenant_id(self):
-        """Test with Unicode characters in tenant ID."""
-        token_data = {"tid": "tenant-ñ-日本"}
-        encoded = base64.b64encode(json.dumps(token_data).encode("utf-8")).decode()
+    assert user["aad_access_token"] == "case-token"
 
-        result = get_tenantid(encoded)
-        assert result == "tenant-ñ-日本"
 
-    def test_empty_tid_value(self):
-        """Test when tid field is empty string."""
-        token_data = {"tid": ""}
-        encoded = base64.b64encode(json.dumps(token_data).encode()).decode()
+def test_authorization_header_is_found_even_when_its_name_is_capitalized():
+    headers = easyauth_headers()
+    headers["Authorization"] = "Bearer capitalized-header-token"
 
-        result = get_tenantid(encoded)
-        assert result == ""
+    user = auth_utils.get_authenticated_user_details(headers)
 
-    def test_special_characters_in_tid(self):
-        """Test tenant ID with special characters."""
-        token_data = {"tid": "tenant-123-abc-xyz"}
-        encoded = base64.b64encode(json.dumps(token_data).encode()).decode()
+    assert user["aad_access_token"] == "capitalized-header-token"
 
-        result = get_tenantid(encoded)
-        assert result == "tenant-123-abc-xyz"
 
-    def test_return_type(self):
-        """Test that function always returns a string."""
-        # Valid case
-        token_data = {"tid": "test-tenant"}
-        encoded = base64.b64encode(json.dumps(token_data).encode()).decode()
-        assert isinstance(get_tenantid(encoded), str)
+@pytest.mark.parametrize(
+    "authorization",
+    [
+        "Basic dXNlcjpwYXNz",
+        "Negotiate abcdef",
+        "bearertoken-without-space",
+    ],
+)
+def test_non_bearer_authorization_schemes_produce_no_access_token(authorization):
+    headers = easyauth_headers(**{"authorization": authorization})
 
-        # None case
-        assert isinstance(get_tenantid(None), str)
+    user = auth_utils.get_authenticated_user_details(headers)
 
-        # Invalid case
-        assert isinstance(get_tenantid("invalid"), str)
+    assert user["aad_access_token"] is None
 
-    def test_with_additional_fields(self):
-        """Test that other fields in JSON don't affect tid extraction."""
-        token_data = {
-            "tid": "main-tenant",
-            "aud": "audience",
-            "sub": "subject",
-            "iss": "issuer",
-            "exp": 1234567890,
-        }
-        encoded = base64.b64encode(json.dumps(token_data).encode()).decode()
 
-        result = get_tenantid(encoded)
-        assert result == "main-tenant"
+@pytest.mark.parametrize("authorization", ["Bearer", "Bearer ", "Bearer    "])
+def test_bearer_scheme_without_a_token_produces_no_access_token(authorization):
+    headers = easyauth_headers(**{"authorization": authorization})
+
+    user = auth_utils.get_authenticated_user_details(headers)
+
+    assert user["aad_access_token"] is None
+
+
+def test_missing_authorization_header_produces_no_access_token():
+    user = auth_utils.get_authenticated_user_details(easyauth_headers())
+
+    assert user["aad_access_token"] is None
+    assert user["user_principal_id"] == PRINCIPAL_ID
+
+
+@pytest.mark.parametrize("empty_value", ["", None])
+def test_empty_easyauth_access_token_falls_through_to_the_zumo_header(empty_value):
+    headers = easyauth_headers()
+    if empty_value is not None:
+        headers["x-ms-token-aad-access-token"] = empty_value
+    headers["x-zumo-auth"] = "zumo-token"
+
+    user = auth_utils.get_authenticated_user_details(headers)
+
+    assert user["aad_access_token"] == "zumo-token"
+
+
+# --------------------------------------------------------------------------- #
+# get_tenantid
+# --------------------------------------------------------------------------- #
+
+
+def test_extracts_the_tenant_id_from_a_base64_encoded_client_principal():
+    encoded = b64_principal({"tid": "tenant-abc", "oid": "object-123"})
+
+    assert auth_utils.get_tenantid(encoded) == "tenant-abc"
+
+
+def test_returns_none_when_the_decoded_principal_has_no_tid_claim():
+    encoded = b64_principal({"oid": "object-123"})
+
+    assert auth_utils.get_tenantid(encoded) is None
+
+
+def test_returns_empty_string_and_logs_when_the_value_is_not_valid_base64(caplog):
+    with caplog.at_level(logging.ERROR):
+        tenant_id = auth_utils.get_tenantid("!!!not-base64!!!")
+
+    assert tenant_id == ""
+    assert any(record.levelno >= logging.ERROR for record in caplog.records)
+
+
+def test_returns_empty_string_and_logs_when_the_decoded_payload_is_not_json(caplog):
+    encoded = base64.b64encode(b"plain text, not json").decode("utf-8")
+
+    with caplog.at_level(logging.ERROR):
+        tenant_id = auth_utils.get_tenantid(encoded)
+
+    assert tenant_id == ""
+    assert any("JSON" in record.getMessage() or record.exc_info for record in caplog.records)
+
+
+def test_returns_empty_string_and_logs_when_the_payload_is_not_utf8(caplog):
+    encoded = base64.b64encode(b"\xff\xfe\xfa\xfb").decode("utf-8")
+
+    with caplog.at_level(logging.ERROR):
+        tenant_id = auth_utils.get_tenantid(encoded)
+
+    assert tenant_id == ""
+    assert len(caplog.records) == 1
+
+
+def test_returns_empty_string_when_the_decoded_principal_is_a_json_list(caplog):
+    encoded = base64.b64encode(b'["tid"]').decode("utf-8")
+
+    with caplog.at_level(logging.ERROR):
+        tenant_id = auth_utils.get_tenantid(encoded)
+
+    assert tenant_id == ""
+    assert len(caplog.records) == 1
+
+
+@pytest.mark.parametrize("falsy", ["", None, 0])
+def test_falsy_client_principal_short_circuits_without_logging(falsy, caplog):
+    with caplog.at_level(logging.DEBUG):
+        tenant_id = auth_utils.get_tenantid(falsy)
+
+    assert tenant_id == ""
+    assert caplog.records == []
+
+
+def test_tenant_id_round_trips_from_the_header_produced_by_get_authenticated_user_details():
+    encoded = b64_principal({"tid": "tenant-from-header"})
+    user = auth_utils.get_authenticated_user_details(
+        easyauth_headers(**{"x-ms-client-principal": encoded})
+    )
+
+    assert auth_utils.get_tenantid(user["client_principal_b64"]) == "tenant-from-header"
