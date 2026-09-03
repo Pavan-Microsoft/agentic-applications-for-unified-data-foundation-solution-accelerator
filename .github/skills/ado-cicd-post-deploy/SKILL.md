@@ -129,11 +129,17 @@ CI.)
   above), and any version
   defaults. Steps flagged `interactive_prompts` or `prints_only` are resolved by supplying the
   non-interactive default and noting it — not by asking. **Escalate a separate keep/skip decision
-  only for a genuinely cost-bearing or destructive step**: an *optional* post-deploy validation that
-  consumes paid quota on every run (e.g. a live AI/model **evaluation** call or a paid external API)
-  or an irreversible action. Default such a step to **skip**, surface it as the one explicit choice,
+  only for a genuinely cost-bearing or destructive step**: an *optional*, **non-interactive,
+  automatable** post-deploy validation whose only concern is per-run paid quota (e.g. a headless
+  AI/model **evaluation** call or a paid external API that runs unattended with a default input), or
+  an irreversible action. Default such a step to **skip**, surface it as the one explicit choice,
   and explain its per-run cost; the required application-deploy step is never treated this way — it
-  always runs.
+  always runs. This paid-quota gate is **narrow**: never apply it to a step that is interactive, that
+  merely *tests / exercises* the deployed solution, or that *configures* it. Distinguish by intent,
+  not by filename — a *test/validation* script verifies the running solution; a *configuration* (or
+  app-deploy / auth-setup) script makes it work. An interactive smoke or agent/model-invocation
+  **test** is **excluded** (developer-only, below), not gated; a configuration or auth/identity-setup
+  step **always runs** (fail-soft, below), never gated.
 - **Every discovered script runs in CI.** If a mandatory post-deploy step has a runnable script
   (`.sh`/`.ps1`/`.py`), it runs in the pipeline **regardless of what the script does**. Do **not**
   downgrade a scripted step to a reminder because of the kind of work it performs; run it and let
@@ -144,12 +150,25 @@ CI.)
   render that only as a manual-reminder **caveat if it fails**, never as a replacement for running
   the script. (Auto-consent succeeds when the pipeline's service connection identity holds a
   privileged Entra role — Cloud Application Administrator / Privileged Role Administrator — or the
-  Graph `DelegatedPermissionGrant.ReadWrite.All` permission; otherwise it fails-soft.) Classify three ways: **run in CI** (default — every
-  discovered script, using non-interactive defaults), **manual reminder** (only steps the guide
-  documents that have **no script** to invoke — actions a person performs by hand that CI cannot
-  script), **developer-only** (exclude — genuinely interactive local validation/smoke steps with no
-  unattended path and no deployment effect). A step is never developer-only merely because it takes
-  a selector or a simple confirmation prompt; supply the default and run it.
+  Graph `DelegatedPermissionGrant.ReadWrite.All` permission; otherwise it fails-soft.) **This applies
+  to authentication / identity-setup scripts specifically** (creating an app registration, granting
+  consent, assigning roles, configuring an on-behalf-of / SSO flow): they are **required
+  configuration** — render them to **always run, fail-soft**, and **never gate them behind an
+  optional / default-off feature-flag pipeline variable**. If such a step only applies when a feature
+  was enabled, let the script self-detect and no-op; the job still invokes it unconditionally. Surface
+  any privileged-role requirement, or artifacts it creates outside the resource group that cleanup
+  will not remove (e.g. a tenant app registration), as a **manual-reminder caveat** — never as a
+  reason to skip or gate the step. Classify three ways: **run in CI** (default — every discovered
+  configuration / auth / app-deploy script, using non-interactive defaults), **manual reminder** (only
+  steps the guide documents that have **no script** to invoke — actions a person performs by hand that
+  CI cannot script), **developer-only** (exclude — genuinely interactive local validation/smoke steps
+  with no unattended path and no deployment/configuration effect, **including a standalone smoke or
+  agent/model-invocation *test* script that interactively exercises the deployed solution**). A
+  configuration or auth step is never developer-only merely because it takes a selector or a simple
+  confirmation prompt; supply the default and run it. But a *test/validation* script is not a
+  post-deploy step at all: if it is the automatable, non-interactive e2e/browser suite it belongs in
+  the e2e job (per the categorical unit→CI / e2e→post-deploy rule); if it is interactive or has no
+  unattended path, **exclude it entirely — do not render it, not even as a gated opt-in step.**
 - **Cleanup is the deploy pipeline's job.** This stage does not delete the resource group; the
   infra deploy pipeline's Cleanup stage (`condition: always()`, `dependsOn: PostDeployTest`) does,
   so tests run against live infrastructure and it is always torn down afterward.
@@ -192,7 +211,13 @@ CI.)
      `skill: keep … when needs_python`) only when `needs_python` is true; otherwise delete it.
    - `__POST_DEPLOY_STEPS__` → one `run_step <runner> <path> [args]` line per confirmed script, in
      order (`runner` ∈ `bash`|`pwsh`|`python`). Append a non-interactive default selector where a
-     step needs one; prefix `printf '\n' | ` for a simple confirmation prompt. **Always include the
+     step needs one; prefix `printf '\n' | ` for a simple confirmation prompt. Render every confirmed
+     configuration / auth / app-deploy step to run **unconditionally** (auth/identity-setup steps
+     fail-soft) — **never wrap a step in a default-off feature-flag `if`** and never render an
+     interactive smoke or agent/model-invocation *test* here (exclude it, or place an automatable
+     non-interactive check in the e2e job). The only permitted gate is the one explicit paid-quota
+     opt-in from the classification rule, and only for a non-interactive automatable validation.
+     **Always include the
      application-deploy step here** (image build+push, then the app roll-out) — a `run_step` line
      when it is a script, or the raw command line(s) when it is a target/command (e.g.
      `azd deploy --all --no-prompt`, or the `az acr build …` + `az containerapp …` a `task deploy`
