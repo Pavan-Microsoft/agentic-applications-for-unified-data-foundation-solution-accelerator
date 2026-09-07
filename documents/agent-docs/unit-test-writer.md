@@ -1,6 +1,6 @@
-# Unit Test Writer Agent
+# Unit Test Generator Agent
 
-`unit-test-writer` generates unit tests for any file or module in a repository by delegating to
+`unit-test-generator` generates unit tests for any file or module in a repository by delegating to
 the in-repo `code-testing-generator` pipeline. It is polyglot and works with Python, TypeScript,
 JavaScript, C#, Go, Java, Rust, and any other language present in the workspace.
 
@@ -15,7 +15,7 @@ should have it, preserving the paths.
 
 | Path | Purpose |
 |---|---|
-| `.github/agents/unit-test-writer.agent.md` | User-facing entry point |
+| `.github/agents/unit-test-generator.agent.md` | User-facing entry point |
 | `.github/agents/code-testing-generator.agent.md` | Pipeline orchestrator |
 | `.github/agents/code-testing-researcher.agent.md` | Discovers structure, frameworks, conventions |
 | `.github/agents/code-testing-planner.agent.md` | Produces the phased test plan |
@@ -109,7 +109,7 @@ repair loop against a problem it did not create.
    `.github/agents/` and `.github/skills/unit-test-agent-skills/` paths. Register the nested skill
    directory in `.vscode/settings.json` with `chat.agentSkillsLocations`.
 2. Reload the VS Code window.
-3. Open Copilot Chat and confirm `unit-test-writer` appears in the agent picker.
+3. Open Copilot Chat and confirm `unit-test-generator` appears in the agent picker.
 4. Create and activate the environment for the language under test, then install both the production
    dependencies and the test tooling.
 5. Run the existing test suite once. A green baseline, or a knowingly empty one, is the signal that
@@ -149,14 +149,14 @@ when the target is pure logic with no I/O.
 
 ### From the agent picker
 
-Open Copilot Chat, choose `unit-test-writer` from the agent dropdown, then describe the target.
+Open Copilot Chat, choose `unit-test-generator` from the agent dropdown, then describe the target.
 
 ### From the default agent
 
 Ask for the agent by name and the request is routed for you.
 
 ```text
-Use the unit-test-writer agent to generate unit tests for src/services/billing.py
+Use the unit-test-generator agent to generate unit tests for src/services/billing.py
 ```
 
 ### Prompt template
@@ -206,7 +206,7 @@ interesting about the pipeline.
 
    Record the starting percentage. Zero is a fine starting point and makes the demo clearer.
 
-2. Open Copilot Chat, select `unit-test-writer`, and paste a filled-in prompt template.
+2. Open Copilot Chat, select `unit-test-generator`, and paste a filled-in prompt template.
 
    ```text
    Generate unit tests for src/services/billing.py.
@@ -344,14 +344,14 @@ Mocks sometimes over-specify. Assertions on internal call ordering or private co
 tests that break on harmless refactors, so prune them during review.
 
 VS Code registers every markdown file in `.github/agents/` as an agent. This README currently
-appears in the agent picker as `unit-test-writer.README` with no description. It is harmless but
+appears in the agent picker as `unit-test-generator.README` with no description. It is harmless but
 untidy, and moving the file out of that folder resolves it.
 
 ## Troubleshooting
 
 | Symptom | Cause | Fix |
 |---|---|---|
-| Agent missing from the picker | Definition not discovered | Confirm the file sits at `.github/agents/unit-test-writer.agent.md`, then reload the window |
+| Agent missing from the picker | Definition not discovered | Confirm the file sits at `.github/agents/unit-test-generator.agent.md`, then reload the window |
 | Agent replies without producing tests | Delegation returned empty | Re-ask with an explicit file path; the agent is required to retry rather than write tests itself |
 | Delegation fails immediately | Sub-agent files missing | Copy the full `code-testing-*` set from the required files table |
 | `ModuleNotFoundError` in generated tests | Module directory not on the import path | Add a `conftest.py` that bootstraps `sys.path`, or set `pythonpath` in `pytest.ini` |
