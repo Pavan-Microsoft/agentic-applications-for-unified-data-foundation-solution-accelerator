@@ -4,5 +4,9 @@
     "chat.agentFilesLocations": {
         ".github/agents": true,
         ".github/agents/unit-test-subagents": true
+    },
+    "chat.agentSkillsLocations": {
+        ".github/skills": true,
+        ".github/skills/unit-test-agent-skills": true
     }
 }

@@ -24,8 +24,9 @@ should have it, preserving the paths.
 | `.github/agents/code-testing-tester.agent.md` | Runs the test suite |
 | `.github/agents/code-testing-fixer.agent.md` | Repairs compilation and import failures |
 | `.github/agents/code-testing-linter.agent.md` | Applies formatting and lint fixes |
-| `.github/skills/code-testing-agent/` | Default conventions, coverage goals, quality bar |
-| `.github/skills/code-testing-extensions/` | Language-specific authoring guidance |
+| `.github/skills/unit-test-agent-skills/code-testing-agent/` | Default conventions, coverage goals, quality bar |
+| `.github/skills/unit-test-agent-skills/code-testing-extensions/` | Language-specific authoring guidance |
+| `.vscode/settings.json` | Registers the nested unit-test skill location with VS Code |
 
 These skills are optional but improve the quality gate the pipeline applies before reporting
 completion: `assertion-quality`, `test-gap-analysis`, `test-anti-patterns`, `find-untested-sources`,
@@ -105,7 +106,8 @@ pipeline runs the tests it writes, so a runner that cannot execute today will se
 repair loop against a problem it did not create.
 
 1. Copy the agent and skill files from the required files table into the target repo, preserving the
-   `.github/agents/` and `.github/skills/` paths.
+   `.github/agents/` and `.github/skills/unit-test-agent-skills/` paths. Register the nested skill
+   directory in `.vscode/settings.json` with `chat.agentSkillsLocations`.
 2. Reload the VS Code window.
 3. Open Copilot Chat and confirm `unit-test-writer` appears in the agent picker.
 4. Create and activate the environment for the language under test, then install both the production
@@ -361,6 +363,6 @@ untidy, and moving the file out of that folder resolves it.
 ## Adding the agent to another repo
 
 Copy the agent and skill files from the required files table, keeping the `.github/agents/` and
-`.github/skills/` layout. Commit them, reload VS Code, and the agent is available. Nothing else in
-the repository needs to change, and the pipeline detects the language and test conventions on its
-own.
+`.github/skills/unit-test-agent-skills/` layout. Register that skill directory with
+`chat.agentSkillsLocations`, commit the files, and reload VS Code. The pipeline then detects the
+language and test conventions on its own.
