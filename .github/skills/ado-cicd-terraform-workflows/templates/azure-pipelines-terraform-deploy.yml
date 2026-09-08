@@ -121,3 +121,12 @@ stages:
                 else
                   echo "Resource group $RG does not exist; nothing to delete."
                 fi
+                # Belt-and-suspenders: also delete any resource group tagged with this run id, in
+                # case the solution created a differently-named group and the state capture was lost
+                # (e.g. the apply job was cancelled before it could record the real name).
+                for g in $(az group list --tag deploymentPipelineRunId="$(Build.BuildId)" \
+                            --query "[].name" -o tsv 2>/dev/null || true); do
+                  [ -n "$g" ] && [ "$g" != "$RG" ] || continue
+                  echo "Deleting resource group tagged for this run: $g"
+                  az group delete --name "$g" --yes || true
+                done

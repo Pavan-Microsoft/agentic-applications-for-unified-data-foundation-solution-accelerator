@@ -42,7 +42,7 @@ Create a variable group (default name `bicep-deploy`) and link it in the deploy 
 | --- | --- | --- |
 | `AZURE_SUBSCRIPTION_ID` | `0ff2547f-...` | target subscription |
 | `AZURE_LOCATION` | `eastus2` | region for the resource group |
-| `ENV_PREFIX` | `aaudf` | short prefix for unique naming (≤ 8 chars) |
+| `ENV_PREFIX` | `sol` | short prefix for unique naming (≤ 8 chars) |
 | _required `${VAR}`s_ | — | every token from `main.parameters.json` **without** a `=default` |
 
 The discovery script (`inspect-repo.sh`) lists the exact required variable names under

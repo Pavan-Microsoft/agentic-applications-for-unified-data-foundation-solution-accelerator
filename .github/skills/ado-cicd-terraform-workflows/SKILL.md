@@ -129,7 +129,10 @@ Terraform infrastructure.
      `.agent/tmp/test-facts.json` doesn't already exist; the same file also drives that skill's
      Playwright job). **Keep only the `unit_*` jobs whose category is present** and delete the rest;
      fill `__FE_DIR__`/`__FE_INSTALL__`/`__FE_TEST__` (e.g. `npm ci` / `npm test`),
-     `__PYTEST_DIR__`/`__PYTEST_REQS__`, `__DOTNET_DIR__`, and `__PY_VERSION__`. If no unit category
+     `__PYTEST_DIR__`/`__PYTEST_REQS__`, `__DOTNET_DIR__`, and `__PY_VERSION__`. Set
+     `__PYTEST_IGNORE__` from `unit_backend.pytest.ignore`: when non-null render `--ignore=<dir>`
+     (the e2e/Playwright directory, as a path relative to `__PYTEST_DIR__`) so the hermetic PR run
+     never collects the live-app e2e suite; when null replace it with an empty string. If no unit category
      is present, delete all three and keep just `infra_validation`. (A "unit" suite that actually
      hits live endpoints is integration — leave it to the post-deploy e2e stage instead.) Render a
      `unit_*` job **only** for a category `discover-tests.sh` reports `present: true`; never infer a

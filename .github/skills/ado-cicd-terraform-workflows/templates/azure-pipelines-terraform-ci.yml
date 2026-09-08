@@ -13,7 +13,7 @@
 #   __TF_VERSION__      e.g. 1.9.8
 # Unit-test placeholders (from ado-cicd-post-deploy/scripts/discover-tests.sh) — the unit-test jobs
 # below are kept only for the categories that discovery reports present; delete the others:
-#   __PY_VERSION__ __FE_DIR__ __FE_INSTALL__ __FE_TEST__ __PYTEST_DIR__ __PYTEST_REQS__ __DOTNET_DIR__
+#   __PY_VERSION__ __FE_DIR__ __FE_INSTALL__ __FE_TEST__ __PYTEST_DIR__ __PYTEST_REQS__ __PYTEST_IGNORE__ __DOTNET_DIR__
 
 trigger: none # CI runs on PRs only (see pr:)
 
@@ -112,7 +112,8 @@ jobs:
             set -euo pipefail
             python -m pip install uv pytest
             [ -f "__PYTEST_REQS__" ] && uv pip install --system -r "__PYTEST_REQS__" || true
-            pytest
+            # __PYTEST_IGNORE__ keeps any live-app e2e/Playwright suite out of this hermetic PR run.
+            pytest __PYTEST_IGNORE__
 
   # --- unit_backend_dotnet: keep only when unit_backend.dotnet.present ---
   - job: unit_backend_dotnet

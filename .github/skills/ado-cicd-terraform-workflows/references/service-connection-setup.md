@@ -38,7 +38,7 @@ Create a variable group (default name `terraform-deploy`) and link it in the dep
 | --- | --- | --- |
 | `AZURE_SUBSCRIPTION_ID` | `0ff2547f-...` | target subscription (also used for `ARM_SUBSCRIPTION_ID`) |
 | `AZURE_LOCATION` | `eastus2` | region, passed as `-var location=` |
-| `ENV_PREFIX` | `aaudf` | short prefix for unique naming (≤ 8 chars) |
+| `ENV_PREFIX` | `sol` | short prefix for unique naming (≤ 8 chars) |
 | `TF_VAR_<name>` | — | one per required Terraform variable (no default) |
 
 The discovery script (`inspect-repo-tf.sh`) lists the required Terraform variable names under

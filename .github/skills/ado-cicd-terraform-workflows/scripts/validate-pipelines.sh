@@ -24,7 +24,8 @@ collect() {
   elif [ -f "$1" ]; then
     echo "$1" >> "$tmp_list"
   else
-    echo "warn  not found: $1" >&2
+    echo "ERROR not found: $1" >&2
+    fail=1
   fi
 }
 
@@ -33,6 +34,13 @@ if [ "$#" -eq 0 ]; then
   exit 2
 fi
 for arg in "$@"; do collect "$arg"; done
+
+# A requested target that matched no file is a hard error — never report success while validating
+# nothing (e.g. a mistyped path, or a pipeline directory that has not been rendered yet).
+if [ ! -s "$tmp_list" ]; then
+  echo "FAIL: no pipeline files found in the requested target(s)." >&2
+  exit 1
+fi
 
 YAML_CHECK=""
 for cand in python3 python; do

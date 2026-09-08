@@ -101,22 +101,46 @@ steps:
         # shape as ARM deployment outputs, so the post-deploy hydration is identical. (A raw
         # `terraform apply` leaves no ARM deployment in the resource group, so the outputs must
         # travel as a pipeline artifact rather than being read back from the group.)
-        terraform output -json > "$(pwd)/infra-outputs.json" 2>/dev/null || echo '{}' > "$(pwd)/infra-outputs.json"
+        #
+        # Publish only NON-sensitive outputs: Terraform marks secret-bearing outputs with
+        # "sensitive": true, and this JSON is published as an artifact AND fanned out into ordinary
+        # (non-secret) pipeline variables by the post-deploy hydration. Dropping sensitive entries
+        # here keeps secrets out of artifacts, logs, and task inputs.
+        if terraform output -json > tf-outputs.raw.json 2>/dev/null; then
+          # Fail CLOSED: if the sensitive-output filter cannot run for any reason, never fall back to
+          # publishing the raw (unfiltered) outputs — delete the raw file and fail the task instead,
+          # so a filter error can never leak secret-bearing outputs into the artifact, the logs, or
+          # the pipeline variables the post-deploy hydration derives from them.
+          if jq 'with_entries(select(.value.sensitive != true))' tf-outputs.raw.json \
+                > "$(pwd)/infra-outputs.json" 2>/dev/null; then
+            rm -f tf-outputs.raw.json
+          else
+            echo "ERROR: unable to filter sensitive Terraform outputs; refusing to publish raw outputs." >&2
+            rm -f tf-outputs.raw.json "$(pwd)/infra-outputs.json"
+            exit 1
+          fi
+        else
+          echo '{}' > "$(pwd)/infra-outputs.json"
+        fi
         echo "Wrote infra-outputs.json ($(wc -c < infra-outputs.json) bytes)."
 
   # Capture the resource group that was ACTUALLY created, straight from Terraform state — do not
   # assume the generated name, because a solution may build its own resource-group name (e.g.
   # rg-<project>-<random_suffix>) and ignore the injected `resource_group_name` var. Reading it from
-  # state is repo-agnostic. Runs on success or failure so a partially-created group is still
+  # state is repo-agnostic. Runs even on failure or cancellation so a partially-created group is still
   # captured for Cleanup. The real name is merged into infra-outputs.json under AZURE_RESOURCE_GROUP,
   # which the post-deploy hydration fans out (so scripts target the real group) and Cleanup reads.
-  - task: Bash@3
-    displayName: Capture created resource group (from Terraform state)
-    condition: succeededOrFailed()
+  # It also TAGS the group with this pipeline run id, so Cleanup can delete it by tag even when the
+  # name diverged from the deterministic one — a name-independent safety net against leaks.
+  - task: AzureCLI@2
+    displayName: Capture and tag created resource group
+    condition: always()
     inputs:
+      azureSubscription: ${{ parameters.serviceConnection }}
+      scriptType: bash
       workingDirectory: ${{ parameters.workingDirectory }}
-      targetType: inline
-      script: |
+      scriptLocation: inlineScript
+      inlineScript: |
         set -uo pipefail
         [ -f infra-outputs.json ] || echo '{}' > infra-outputs.json
         ACTUAL_RG=""
@@ -129,6 +153,12 @@ steps:
         echo "Resource group actually created: $ACTUAL_RG"
         jq --arg rg "$ACTUAL_RG" '. + {AZURE_RESOURCE_GROUP: {value: $rg}}' infra-outputs.json \
           > infra-outputs.tmp && mv infra-outputs.tmp infra-outputs.json
+        # Tag the group with this run id (best-effort, merges without disturbing other tags) so the
+        # Cleanup stage can find and delete it by tag if the name is not the deterministic one.
+        if az group exists --name "$ACTUAL_RG" 2>/dev/null | grep -qi true; then
+          az group update --name "$ACTUAL_RG" \
+            --set tags.deploymentPipelineRunId="$(Build.BuildId)" >/dev/null 2>&1 || true
+        fi
 
   - task: PublishPipelineArtifact@1
     displayName: Publish Terraform outputs

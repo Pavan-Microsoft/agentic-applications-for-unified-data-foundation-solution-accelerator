@@ -84,6 +84,27 @@ steps:
               # Fail fast if substitution produced invalid JSON.
               python3 -c "import json,sys; json.load(open('main.parameters.resolved.json'))" 2>/dev/null \
                 || { echo "Resolved parameters are not valid JSON:"; cat main.parameters.resolved.json; exit 1; }
+              # Drop any parameter whose value resolved to empty — an unset variable with no
+              # ${VAR=default} — so the Bicep template's OWN declared default applies instead of an
+              # empty string (which would override the default and be rejected by any @allowed()).
+              # A parameter that is genuinely required (no Bicep default) then fails fast at
+              # deployment with a clear "missing required parameter" error.
+              jq 'if .parameters then .parameters |= with_entries(select((.value.value // "") != "")) else . end' \
+                main.parameters.resolved.json > main.parameters.trimmed.json \
+                && mv main.parameters.trimmed.json main.parameters.resolved.json
+              # Restore JSON types for whole-value tokens: a parameter whose resolved value is a
+              # string that is itself a complete JSON array or object (e.g. an array param written as
+              # "value": "${VAR}" with VAR set to "[]") is converted back to that array/object, since
+              # Bicep rejects a string where it expects a structured type. Scalars stay strings (azd
+              # parity, avoids the "123"/"true" ambiguity); fromjson also normalizes any embedded
+              # escaping. A value that does not parse as JSON is left untouched.
+              jq 'if .parameters then .parameters |= with_entries(
+                    if (.value.value | type) == "string"
+                       and ((.value.value | try (fromjson | type) catch "s") | (. == "array" or . == "object"))
+                    then .value.value |= fromjson else . end)
+                  else . end' \
+                main.parameters.resolved.json > main.parameters.typed.json \
+                && mv main.parameters.typed.json main.parameters.resolved.json
               echo "Resolved parameters written to main.parameters.resolved.json"
               PARAM_ARG="--parameters @main.parameters.resolved.json"
               ;;

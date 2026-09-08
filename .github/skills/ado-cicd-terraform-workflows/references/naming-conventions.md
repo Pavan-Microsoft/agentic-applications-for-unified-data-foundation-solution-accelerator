@@ -1,7 +1,7 @@
 # Naming conventions
 
 ## Per-run identifiers (set by the deploy pipeline)
-- `ENV_PREFIX` — short, lowercase, alphanumeric prefix from the variable group (e.g. `ado`, `aaudf`).
+- `ENV_PREFIX` — short, lowercase, alphanumeric prefix from the variable group (e.g. `ado`, `sol`).
   Keep it **short (≤ 8 chars)**: it is combined with the build id and then with the Terraform
   `solution_unique_text` / random suffix, and many Azure resource names have tight length limits.
 - `SOLUTION_NAME` = `$(ENV_PREFIX)$(Build.BuildId)` — unique per run; passed as

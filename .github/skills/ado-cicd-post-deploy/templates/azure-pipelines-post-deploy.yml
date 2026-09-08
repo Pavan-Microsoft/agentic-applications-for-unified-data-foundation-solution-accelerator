@@ -17,7 +17,9 @@
 #   3. Runs the discovered post-deploy scripts, in order.
 #   4. Runs the Playwright/e2e test job — only when a Playwright suite was discovered. Unit tests do
 #      NOT run here; they run on every PR in the flavor CI pipeline(s). Only e2e, which needs the
-#      live deployed app, runs in this post-deploy stage.
+#      live deployed app, runs in this post-deploy stage. The e2e job runs on a separate agent, so
+#      the hydrated `.env` is published by post_deploy as the `post-deploy-env` artifact and loaded
+#      by the e2e job (job-scoped variables/files do not cross the job boundary).
 #
 # It never edits the repo's infra / app / post-provision sources.
 #
@@ -136,6 +138,16 @@ stages:
                 done < kv.tsv
                 echo "Hydrated $(wc -l < kv.tsv) output(s) into azd env '$AZD_ENV' and .env."
 
+          # Publish the hydrated .env so the separate-agent Playwright/e2e job (fresh checkout, no
+          # job-scoped variables) can load the deployed app's config. Job-scoped `.env` and
+          # `task.setvariable` values do NOT cross the job boundary, so they must travel as an
+          # artifact. Sensitive Terraform outputs were already excluded upstream (infra-terraform.yml).
+          - task: PublishPipelineArtifact@1
+            displayName: Publish hydrated config for the e2e job
+            inputs:
+              targetPath: .env
+              artifact: post-deploy-env
+
           # --- skill: keep the next two steps only when post_deploy_plan.needs_python is true ---
           - task: UsePythonVersion@0
             displayName: Use Python __PY_VERSION__
@@ -209,6 +221,15 @@ stages:
         condition: succeeded()
         steps:
           - checkout: self
+          # Load the deployment config the post_deploy job hydrated (endpoints, etc.). It arrives as
+          # an artifact because this job runs on a separate agent where job-scoped variables/.env
+          # from post_deploy are not available.
+          - task: DownloadPipelineArtifact@2
+            displayName: Download hydrated config
+            continueOnError: true
+            inputs:
+              artifact: post-deploy-env
+              path: $(Pipeline.Workspace)/post-deploy-env
           # --- skill: keep this block for playwright.language == python ---
           - task: UsePythonVersion@0
             inputs:
@@ -220,10 +241,21 @@ stages:
               workingDirectory: __PW_DIR__
               script: |
                 set -euo pipefail
+                ENVF="${PIPELINE_WORKSPACE:-$(pwd)}/post-deploy-env/.env"
+                if [ -f "$ENVF" ]; then
+                  while IFS='=' read -r k v; do
+                    case "$k" in ''|\#*) continue ;; esac
+                    export "$k=$v"
+                  done < "$ENVF"
+                  echo "Loaded hydrated config from $ENVF"
+                fi
                 python -m pip install uv
                 [ -f "__PW_REQS__" ] && uv pip install --system -r "__PW_REQS__" || uv pip install --system playwright pytest-playwright
                 python -m playwright install --with-deps chromium
-                pytest
+                # A suite may launch a headed browser (e.g. headless=False in conftest); a hosted
+                # Linux agent has no display. Run under a virtual framebuffer when one is available so
+                # a headed launch still works, and fall back to a direct run otherwise.
+                if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a pytest; else pytest; fi
           # --- skill: OR keep this block for playwright.language == node ---
           - task: Bash@3
             displayName: Run Playwright (node)
@@ -232,6 +264,16 @@ stages:
               workingDirectory: __PW_DIR__
               script: |
                 set -euo pipefail
+                ENVF="${PIPELINE_WORKSPACE:-$(pwd)}/post-deploy-env/.env"
+                if [ -f "$ENVF" ]; then
+                  while IFS='=' read -r k v; do
+                    case "$k" in ''|\#*) continue ;; esac
+                    export "$k=$v"
+                  done < "$ENVF"
+                  echo "Loaded hydrated config from $ENVF"
+                fi
                 npm ci
                 npx playwright install --with-deps chromium
-                npx playwright test
+                # Run under a virtual framebuffer when one is available so a headed launch (e.g.
+                # headless: false) still works on a display-less hosted agent; fall back otherwise.
+                if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a npx playwright test; else npx playwright test; fi

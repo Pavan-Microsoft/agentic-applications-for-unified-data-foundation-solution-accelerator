@@ -238,6 +238,9 @@ CI.)
      matching Playwright variant (`__PW_DIR__`/`__PW_REQS__`; keep the python **or** node block per
      `playwright.language`). The `playwright` job's `dependsOn: post_deploy` is already correct — no
      unit-test jobs live in this stage. (Unit tests are rendered by the flavor CI skill instead.)
+     The deployed app's config reaches this job automatically: `post_deploy` publishes the hydrated
+     `.env` as the `post-deploy-env` artifact and the e2e job loads it (job-scoped variables do not
+     cross agents) — no per-repo wiring needed.
 6. **Wire it into the deploy pipeline.** The `ado-cicd-bicep-workflows` /
    `ado-cicd-terraform-workflows` deploy pipelines already reference this stage template between
    Provision and Cleanup. Confirm the reference passes `serviceConnection`, `resourceGroup`,

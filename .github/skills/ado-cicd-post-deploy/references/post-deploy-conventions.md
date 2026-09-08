@@ -186,6 +186,15 @@ if the step is otherwise a run-in-CI category and the prompt is a simple confirm
 default, run it unattended (pass the default selector, pipe stdin). Only exclude when there is no
 non-interactive path. Decide with the user; never edit the script.
 
+**Authentication / identity-setup caveat — prefer federation.** An auth-setup script that creates or
+reuses an **app registration and appends a client secret on every run** accumulates Entra directory
+objects and credentials that resource-group cleanup cannot delete (they live in the tenant, not the
+RG). Prefer **workload-identity federation** (a federated credential on a reused, deterministically
+named app registration) over generating a new secret per run, so nothing is left behind. When the
+solution's own script still creates a secret, surface a manual-reminder caveat to periodically prune
+stale registrations for this solution. This is guidance for the solution's script + service
+connection (not something the generated YAML can fix on its own).
+
 ## Test discovery (`discover-tests.sh`)
 
 Purely structural, no solution knowledge:
@@ -203,6 +212,11 @@ not into this stage. **Only `playwright`/e2e is rendered here**, because e2e nee
 app. Render the `playwright` job only when present; it uses `dependsOn: post_deploy` (no unit-test
 jobs exist in this stage). If a suite labelled "unit" actually calls live endpoints, it is really
 integration — keep it in this stage, not CI.
+
+When the pytest marker directory contains a **Python Playwright/e2e** suite beneath it, a plain
+`pytest` in CI would recursively collect that live-app suite and fail (no deployed app, Playwright
+deps absent). `discover-tests.sh` therefore reports `unit_backend.pytest.ignore` (the e2e directory),
+which the flavor CI skill renders as `--ignore=<dir>` on the hermetic PR pytest job.
 
 ## Rendering the confirmed plan into the stage template
 

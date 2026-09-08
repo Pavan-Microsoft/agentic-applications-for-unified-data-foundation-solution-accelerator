@@ -127,6 +127,16 @@ if [ "$pw_present" = true ] && [ "$pw_lang" = "python" ]; then
   [ -f "$pw_dir/requirements.txt" ] && pw_reqs="$pw_dir/requirements.txt"
 fi
 
+# The hermetic unit pytest job (rendered into the flavor CI pipeline) runs from the pytest marker
+# directory, which can recursively collect a Python Playwright/e2e suite living beneath it. Those
+# e2e tests need the live deployed app (and Playwright deps not installed in CI), so collecting them
+# on a PR breaks CI. Report the e2e directory so the CI job can `--ignore` it. Only meaningful when
+# the e2e suite is Python (a Node Playwright suite is never collected by pytest).
+py_ignore=""
+if [ "$py_present" = true ] && [ "$pw_present" = true ] && [ "$pw_lang" = "python" ] && [ -n "$pw_dir" ]; then
+  py_ignore="$pw_dir"
+fi
+
 jq -n \
   --arg repo_root "$REPO_ROOT" \
   --argjson fe_present "$fe_present" \
@@ -136,6 +146,7 @@ jq -n \
   --argjson py_present "$py_present" \
   --arg py_dir "$py_dir" \
   --arg py_reqs "$py_reqs" \
+  --arg py_ignore "$py_ignore" \
   --argjson dotnet_present "$dotnet_present" \
   --arg dotnet_dir "$dotnet_dir" \
   --argjson pw_present "$pw_present" \
@@ -154,7 +165,8 @@ jq -n \
       pytest: {
         present: $py_present,
         directory: (if $py_dir=="" then null else $py_dir end),
-        requirements: (if $py_reqs=="" then null else $py_reqs end)
+        requirements: (if $py_reqs=="" then null else $py_reqs end),
+        ignore: (if $py_ignore=="" then null else $py_ignore end)
       },
       dotnet: {
         present: $dotnet_present,
