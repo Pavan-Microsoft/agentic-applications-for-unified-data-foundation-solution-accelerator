@@ -1,5 +1,5 @@
 ---
-name: unit-test-writer
+name: unit-test-generator
 description: >-
   Generates unit tests for any language or framework in this project by
   delegating to the in-repo code-testing agent pipeline. Use when: write unit
@@ -17,7 +17,7 @@ agents:
   - code-testing-linter
 ---
 
-# Unit Test Writer
+# Unit Test Generator
 
 You generate unit tests for any file or module in this project by delegating to
 the `code-testing-generator` agent. You are polyglot — you work with Python,
