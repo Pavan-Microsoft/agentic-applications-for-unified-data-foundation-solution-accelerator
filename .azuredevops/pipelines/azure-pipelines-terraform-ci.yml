@@ -1,0 +1,117 @@
+# Azure DevOps — Terraform CI (static validation + unit tests)
+#
+# Runs on every PR to the default branch (no path filter): fast, credential-free Terraform static
+# checks (`terraform fmt`, `terraform init -backend=false`, `terraform validate`) PLUS the repo's
+# unit tests, so a PR gets full code-and-infra feedback without applying anything. Unit tests are
+# hermetic (no live Azure), so they belong here, not in the deploy pipeline. The full create ->
+# apply -> post-deploy -> e2e -> cleanup cycle (including Playwright/e2e, which needs a live app)
+# still runs in the deploy pipeline (push to the default branch, schedule, or manual), never on a PR.
+
+trigger: none # CI runs on PRs only (see pr:)
+
+pr:
+  branches:
+    include:
+      - main
+  # No path filter: unit tests must run on any PR, whatever changed (infra or app code).
+
+pool:
+  vmImage: ubuntu-latest
+
+jobs:
+  # ---------------------------------------------------------------------------------------
+  # Static Terraform validation — fmt / init -backend=false / validate. Credential-free.
+  # ---------------------------------------------------------------------------------------
+  - job: infra_validation
+    displayName: Terraform static validation
+    variables:
+      INFRA_TF_DIR: infra_tf
+      TF_VERSION: 1.6.0
+    steps:
+      - checkout: self
+
+      - task: Bash@3
+        displayName: Install Terraform (if not preinstalled)
+        inputs:
+          targetType: inline
+          script: |
+            set -euo pipefail
+            if command -v terraform >/dev/null 2>&1; then
+              echo "terraform present: $(terraform version | head -n 1)"
+            else
+              echo "Installing Terraform $TF_VERSION..."
+              curl -fsSL -o /tmp/tf.zip "https://releases.hashicorp.com/terraform/${TF_VERSION}/terraform_${TF_VERSION}_linux_amd64.zip"
+              unzip -o /tmp/tf.zip -d /tmp/tfbin >/dev/null
+              sudo mv /tmp/tfbin/terraform /usr/local/bin/terraform
+              terraform version
+            fi
+
+      - task: Bash@3
+        displayName: terraform fmt (check)
+        inputs:
+          targetType: inline
+          workingDirectory: $(INFRA_TF_DIR)
+          script: |
+            set -euo pipefail
+            terraform fmt -check -recursive -diff
+
+      - task: Bash@3
+        displayName: terraform validate
+        inputs:
+          targetType: inline
+          workingDirectory: $(INFRA_TF_DIR)
+          script: |
+            set -euo pipefail
+            # Init without a backend and without provider network calls, then validate the config.
+            terraform init -backend=false -input=false
+            terraform validate
+
+  # ---------------------------------------------------------------------------------------
+  # Unit tests — run on every PR (hermetic, no live Azure). Independent jobs (no dependsOn) so
+  # feedback surfaces in parallel with the static validation above.
+  # ---------------------------------------------------------------------------------------
+  - job: unit_frontend
+    displayName: Unit tests (frontend)
+    steps:
+      - checkout: self
+      - task: Bash@3
+        displayName: Install and test (frontend)
+        inputs:
+          targetType: inline
+          workingDirectory: src/App
+          script: |
+            set -euo pipefail
+            npm ci
+            CI=true npm test
+
+  - job: unit_backend_pytest
+    displayName: Unit tests (backend, pytest)
+    steps:
+      - checkout: self
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: "3.11"
+      - task: Bash@3
+        displayName: Install and run pytest
+        inputs:
+          targetType: inline
+          workingDirectory: .
+          script: |
+            set -euo pipefail
+            python -m pip install uv pytest
+            [ -f "src/api/python/requirements.txt" ] && uv pip install --system -r "src/api/python/requirements.txt" || true
+            # --ignore=tests/e2e-test keeps the live-app e2e/Playwright suite out of this hermetic PR run.
+            pytest --ignore=tests/e2e-test
+
+  - job: unit_backend_dotnet
+    displayName: Unit tests (backend, dotnet)
+    steps:
+      - checkout: self
+      - task: Bash@3
+        displayName: dotnet test
+        inputs:
+          targetType: inline
+          workingDirectory: src/api/dotnet/tests/CsApi.Tests
+          script: |
+            set -euo pipefail
+            dotnet test --nologo

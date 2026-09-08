@@ -1,0 +1,265 @@
+# Azure DevOps — reusable STAGE template: post-deploy + tests.
+#
+# Referenced by both infra deploy pipelines (Bicep and Terraform) as:
+#   - template: azure-pipelines-post-deploy.yml
+#     parameters:
+#       serviceConnection: $(SERVICE_CONNECTION)
+#       resourceGroup:     $(AZURE_RESOURCE_GROUP)
+#       azureEnvName:      $(SOLUTION_NAME)   # or $(AZURE_ENV_NAME)
+#       subscriptionId:    $(AZURE_SUBSCRIPTION_ID)
+#       dependsOn:         Provision
+#
+# It defines the `PostDeployTest` stage (the Cleanup stage depends on this name). The stage:
+#   1. Reads the solution's configuration back FROM THE RESOURCE GROUP via `az` (the ARM deployment
+#      outputs azd wrote when it provisioned) — no outputs are passed between stages.
+#   2. Hydrates an azd environment + a repo-root .env from those values, so the solution's own
+#      post-deploy scripts read config exactly as azd would have written it.
+#   3. Runs the discovered post-deploy scripts, in order — including the application deploy.
+#   4. Runs the Playwright/e2e test job. Unit tests do NOT run here; they run on every PR in the
+#      flavor CI pipelines. Only e2e, which needs the live deployed app, runs in this stage. The
+#      e2e job runs on a separate agent, so the hydrated `.env` is published by post_deploy as the
+#      `post-deploy-env` artifact and loaded by the e2e job (job-scoped variables/files do not
+#      cross the job boundary).
+#
+# It never edits the repo's infra / app / post-provision sources.
+
+parameters:
+  - name: serviceConnection
+    type: string
+  - name: resourceGroup
+    type: string
+  - name: azureEnvName
+    type: string
+  - name: subscriptionId
+    type: string
+  - name: dependsOn
+    type: string
+    default: Provision
+
+stages:
+  - stage: PostDeployTest
+    displayName: Post-deploy and tests
+    dependsOn: ${{ parameters.dependsOn }}
+    condition: succeeded()
+    jobs:
+      # -------------------------------------------------------------------------------------
+      # Post-deploy: hydrate config from the RG, then run the solution's post-deploy scripts.
+      # -------------------------------------------------------------------------------------
+      - job: post_deploy
+        displayName: Run post-deploy scripts
+        timeoutInMinutes: 120
+        steps:
+          - checkout: self
+
+          # If the infra stage published its outputs as an artifact (Terraform apply does this,
+          # since a raw apply leaves no ARM deployment in the resource group to read back), pull
+          # it. Bicep/azd does not publish one — the step is optional and the hydration below then
+          # reads the ARM deployment outputs straight from the resource group instead.
+          - task: DownloadPipelineArtifact@2
+            displayName: Download infra outputs (if published)
+            continueOnError: true
+            inputs:
+              artifact: infra-outputs
+              path: $(Pipeline.Workspace)/infra-outputs
+
+          - task: AzureCLI@2
+            displayName: Read config (RG or published outputs) and hydrate azd env
+            inputs:
+              azureSubscription: ${{ parameters.serviceConnection }}
+              scriptType: bash
+              addSpnToEnvironment: true
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                RG='${{ parameters.resourceGroup }}'
+                AZD_ENV='${{ parameters.azureEnvName }}'
+                export AZURE_SUBSCRIPTION_ID='${{ parameters.subscriptionId }}'
+
+                # Prefer a published outputs artifact (Terraform). Otherwise read the deployment
+                # outputs back from the resource group via az (Bicep/azd) — the same values azd
+                # stored when it provisioned. Pick the latest succeeded deployment.
+                ART="${PIPELINE_WORKSPACE:-$(pwd)}/infra-outputs/infra-outputs.json"
+                if [ -f "$ART" ] && [ "$(tr -d '[:space:]' < "$ART")" != "{}" ] && [ -s "$ART" ]; then
+                  echo "Using published infra outputs artifact: $ART"
+                  cp "$ART" infra-outputs.json
+                else
+                  DEP="$(az deployment group list --resource-group "$RG" \
+                    --query "sort_by([?properties.provisioningState=='Succeeded'], &properties.timestamp)[-1].name" \
+                    -o tsv 2>/dev/null || true)"
+                  if [ -z "$DEP" ] || [ "$DEP" = "None" ]; then
+                    echo "No succeeded ARM deployment found in '$RG'; falling back to an empty output set."
+                    echo '{}' > infra-outputs.json
+                  else
+                    echo "Reading outputs from deployment: $DEP"
+                    az deployment group show --resource-group "$RG" --name "$DEP" \
+                      --query properties.outputs -o json > infra-outputs.json
+                  fi
+                fi
+
+                # Install azd and reconstruct an environment the post-deploy scripts can read.
+                curl -fsSL https://aka.ms/install-azd.sh | bash
+                azd version
+                azd auth login \
+                  --client-id "$servicePrincipalId" \
+                  ${servicePrincipalKey:+--client-secret "$servicePrincipalKey"} \
+                  ${servicePrincipalKey:+--tenant-id "$tenantId"} \
+                  ${servicePrincipalKey:--federated-credential-provider "azure-pipelines"} 1>/dev/null 2>&1 || true
+
+                azd env new "$AZD_ENV" --subscription "$AZURE_SUBSCRIPTION_ID" --no-prompt \
+                  || azd env select "$AZD_ENV"
+                azd env set AZURE_RESOURCE_GROUP "$RG"
+
+                # Bridge every scalar output into the azd env and a repo-root .env. ARM lowercases
+                # output keys, so upper-case them to the canonical UPPER_SNAKE names.
+                jq -r '
+                  to_entries[]
+                  | select((.value.value | type) as $t | $t=="string" or $t=="number" or $t=="boolean")
+                  | "\(.key | ascii_upcase)\t\(.value.value | tostring)"
+                ' infra-outputs.json > kv.tsv || : > kv.tsv
+
+                : > .env
+                while IFS="$(printf '\t')" read -r k v; do
+                  [ -n "$k" ] || continue
+                  azd env set "$k" "$v" || true
+                  printf '%s=%s\n' "$k" "$v" >> .env
+                  echo "##vso[task.setvariable variable=$k]$v"
+                done < kv.tsv
+                echo "Hydrated $(wc -l < kv.tsv) output(s) into azd env '$AZD_ENV' and .env."
+
+          # Publish the hydrated .env so the separate-agent Playwright/e2e job (fresh checkout, no
+          # job-scoped variables) can load the deployed app's config. Job-scoped `.env` and
+          # `task.setvariable` values do NOT cross the job boundary, so they must travel as an
+          # artifact. Sensitive Terraform outputs were already excluded upstream (infra-terraform.yml).
+          - task: PublishPipelineArtifact@1
+            displayName: Publish hydrated config for the e2e job
+            inputs:
+              targetPath: .env
+              artifact: post-deploy-env
+
+          - task: UsePythonVersion@0
+            displayName: Use Python 3.11
+            inputs:
+              versionSpec: "3.11"
+
+          - task: Bash@3
+            displayName: Install post-deploy Python dependencies
+            inputs:
+              targetType: inline
+              script: |
+                set -euo pipefail
+                python -m pip install uv
+                uv pip install --system -r infra/scripts/post-provision/requirements.txt
+
+          - task: AzureCLI@2
+            displayName: Run post-deploy steps
+            inputs:
+              azureSubscription: ${{ parameters.serviceConnection }}
+              scriptType: bash
+              addSpnToEnvironment: true
+              scriptLocation: inlineScript
+              inlineScript: |
+                set -euo pipefail
+                export AZURE_ENV_NAME='${{ parameters.azureEnvName }}'
+                export AZURE_RESOURCE_GROUP='${{ parameters.resourceGroup }}'
+                export AZURE_SUBSCRIPTION_ID='${{ parameters.subscriptionId }}'
+                # run_step <runner> <path> [args...]; scripts read config from the azd env / .env.
+                run_step() {
+                  runner="$1"; path="$2"; shift 2
+                  if [ ! -f "$path" ]; then
+                    echo "##vso[task.logissue type=error]post-deploy script '$path' not found."; exit 1
+                  fi
+                  echo "----- $runner $path $*"
+                  case "$runner" in
+                    bash)   bash "$path" "$@" ;;
+                    pwsh)   pwsh -File "$path" "$@" ;;
+                    python) python "$path" "$@" ;;
+                    *) echo "##vso[task.logissue type=error]unknown runner '$runner' for '$path'"; exit 1 ;;
+                  esac
+                }
+                # 1. Application deploy: ACR remote-build + push both images, repoint the App
+                #    Services at them and restart. The resource group is passed explicitly so the
+                #    script auto-discovers ACR/app names from it rather than a local azd env.
+                run_step bash infra/scripts/build/build-and-push-acr.sh --resource-group "$AZURE_RESOURCE_GROUP"
+                # 2. Build the solution (Fabric items, agent prompt, AI Search upload, Foundry
+                #    agent, app config). The piped newline answers its "Press Enter to start".
+                printf '\n' | run_step python infra/scripts/post-provision/00_build_solution.py
+                # 3. App Service authentication + OBO app registration. Fail-soft on admin consent:
+                #    it prints a portal link when the pipeline identity lacks the directory role.
+                run_step pwsh infra/scripts/post-provision/setup_app_authentication.ps1 -ResourceGroup "$AZURE_RESOURCE_GROUP"
+
+          - task: Bash@3
+            displayName: Manual post-steps (reminder)
+            condition: always()
+            inputs:
+              targetType: inline
+              script: |
+                set -euo pipefail
+                {
+                  echo "### Post-deploy — manual steps not run by CI"
+                  echo ""
+                  cat <<'REMINDER'
+                - **Admin consent may need a human.** `setup_app_authentication.ps1` grants admin consent
+                  automatically only when the service connection identity holds a privileged Entra role
+                  (Cloud Application Administrator / Privileged Role Administrator) or the Graph
+                  `DelegatedPermissionGrant.ReadWrite.All` permission. Otherwise it fails soft and logs a
+                  portal link — grant the permissions there under **Enterprise Applications -> Permissions**.
+                - **The OBO app registration is NOT deleted by cleanup.** `setup_app_authentication.ps1`
+                  creates a tenant-level app registration (plus its service principal and client secret).
+                  The Cleanup stage deletes only the resource group, so these accumulate one per run.
+                  Prune them periodically in **Microsoft Entra ID -> App registrations**.
+                - **Interactive agent smoke test is developer-only.**
+                  `python infra/scripts/post-provision/06_test_agent.py` is an interactive chat REPL with no
+                  unattended mode, so CI does not run it. Run it locally against a live deployment to try
+                  the agent by hand.
+                - **`tests/e2e-test` (pytest-playwright) is not run by CI.** That suite drives an interactive
+                  Entra sign-in and needs real user credentials. The root Playwright suite (`e2e/`) is the
+                  automated end-to-end check.
+                REMINDER
+                } | tee "$(Build.ArtifactStagingDirectory)/manual-post-steps.md"
+                # Surface the reminder in the run's Extensions/Summary tab (parity with a step summary).
+                echo "##vso[task.uploadsummary]$(Build.ArtifactStagingDirectory)/manual-post-steps.md"
+
+      # -------------------------------------------------------------------------------------
+      # Playwright / e2e tests. Runs after the post-deploy job so the deployed app is exercised
+      # end-to-end, using the hydrated config. Unit tests are NOT here — they run on every PR in
+      # the flavor CI pipelines.
+      # -------------------------------------------------------------------------------------
+      - job: playwright
+        displayName: Playwright / e2e tests
+        dependsOn: post_deploy
+        condition: succeeded()
+        steps:
+          - checkout: self
+          # Load the deployment config the post_deploy job hydrated (endpoints, etc.). It arrives as
+          # an artifact because this job runs on a separate agent where job-scoped variables/.env
+          # from post_deploy are not available.
+          - task: DownloadPipelineArtifact@2
+            displayName: Download hydrated config
+            continueOnError: true
+            inputs:
+              artifact: post-deploy-env
+              path: $(Pipeline.Workspace)/post-deploy-env
+          - task: Bash@3
+            displayName: Run Playwright (node)
+            inputs:
+              targetType: inline
+              workingDirectory: .
+              script: |
+                set -euo pipefail
+                ENVF="${PIPELINE_WORKSPACE:-$(pwd)}/post-deploy-env/.env"
+                if [ -f "$ENVF" ]; then
+                  while IFS='=' read -r k v; do
+                    case "$k" in ''|\#*) continue ;; esac
+                    export "$k=$v"
+                  done < "$ENVF"
+                  echo "Loaded hydrated config from $ENVF"
+                fi
+                # playwright.config.ts falls back to a hard-coded baseURL; point it at the app this
+                # run just deployed instead.
+                export PLAYWRIGHT_BASE_URL="${PLAYWRIGHT_BASE_URL:-${WEB_APP_URL:-}}"
+                echo "Playwright baseURL: ${PLAYWRIGHT_BASE_URL:-<config default>}"
+                npm ci
+                npx playwright install --with-deps chromium
+                # Run under a virtual framebuffer when one is available so a headed launch (e.g.
+                # headless: false) still works on a display-less hosted agent; fall back otherwise.
+                if command -v xvfb-run >/dev/null 2>&1; then xvfb-run -a npx playwright test; else npx playwright test; fi
