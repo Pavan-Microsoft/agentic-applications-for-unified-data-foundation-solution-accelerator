@@ -13,6 +13,7 @@ pr:
   branches:
     include:
       - main
+      - agents-demo
   # No path filter: unit tests must run on any PR, whatever changed (infra or app code).
 
 pool:
