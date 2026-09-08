@@ -6,14 +6,20 @@
 # so they belong here, not in the deploy pipeline. The full create -> provision -> post-deploy ->
 # e2e -> cleanup cycle (including Playwright/e2e, which needs a live app) still runs in the deploy
 # pipeline (push to the default branch, schedule, or manual), never on a PR.
+#
+# Placeholders rendered by the skill:
+#   __DEFAULT_BRANCH__  e.g. main
+#   __INFRA_DIR__       e.g. infra
+# Unit-test placeholders (from ado-cicd-post-deploy/scripts/discover-tests.sh) — the unit-test jobs
+# below are kept only for the categories that discovery reports present; delete the others:
+#   __PY_VERSION__ __FE_DIR__ __FE_INSTALL__ __FE_TEST__ __PYTEST_DIR__ __PYTEST_REQS__ __PYTEST_IGNORE__ __DOTNET_DIR__
 
 trigger: none # CI runs on PRs only (see pr:)
 
 pr:
   branches:
     include:
-      - main
-      - agents-demo
+      - __DEFAULT_BRANCH__
   # No path filter: unit tests must run on any PR, whatever changed (infra or app code).
 
 pool:
@@ -26,7 +32,7 @@ jobs:
   - job: infra_validation
     displayName: Bicep static validation
     variables:
-      INFRA_DIR: infra
+      INFRA_DIR: __INFRA_DIR__
     steps:
       - checkout: self
 
@@ -100,9 +106,12 @@ jobs:
             exit $rc
 
   # ---------------------------------------------------------------------------------------
-  # Unit tests — run on every PR (hermetic, no live Azure). Independent jobs (no dependsOn) so
-  # all feedback surfaces in parallel with the static validation above.
+  # Unit tests — run on every PR (hermetic, no live Azure). The ado-cicd-post-deploy skill's
+  # discover-tests.sh reports which categories exist; keep only the jobs whose category is
+  # present and delete the rest. These jobs are independent (no dependsOn) so all feedback
+  # surfaces in parallel with the static validation above.
   # ---------------------------------------------------------------------------------------
+  # --- unit_frontend: keep only when discover-tests.sh reports unit_frontend.present ---
   - job: unit_frontend
     displayName: Unit tests (frontend)
     steps:
@@ -111,31 +120,33 @@ jobs:
         displayName: Install and test (frontend)
         inputs:
           targetType: inline
-          workingDirectory: src/App
+          workingDirectory: __FE_DIR__
           script: |
             set -euo pipefail
-            npm ci
-            CI=true npm test
+            __FE_INSTALL__
+            CI=true __FE_TEST__
 
+  # --- unit_backend_pytest: keep only when unit_backend.pytest.present ---
   - job: unit_backend_pytest
     displayName: Unit tests (backend, pytest)
     steps:
       - checkout: self
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: "3.12"
+          versionSpec: "__PY_VERSION__"
       - task: Bash@3
         displayName: Install and run pytest
         inputs:
           targetType: inline
-          workingDirectory: .
+          workingDirectory: __PYTEST_DIR__
           script: |
             set -euo pipefail
             python -m pip install uv pytest
-            [ -f "src/api/python/requirements.txt" ] && uv pip install --system -r "src/api/python/requirements.txt" || true
-            # --ignore=tests/e2e-test keeps the live-app Playwright suite out of this hermetic PR run.
-            pytest --ignore=tests/e2e-test
+            [ -f "__PYTEST_REQS__" ] && uv pip install --system -r "__PYTEST_REQS__" || true
+            # __PYTEST_IGNORE__ keeps any live-app e2e/Playwright suite out of this hermetic PR run.
+            pytest __PYTEST_IGNORE__
 
+  # --- unit_backend_dotnet: keep only when unit_backend.dotnet.present ---
   - job: unit_backend_dotnet
     displayName: Unit tests (backend, dotnet)
     steps:
@@ -144,7 +155,7 @@ jobs:
         displayName: dotnet test
         inputs:
           targetType: inline
-          workingDirectory: src/api/dotnet/tests/CsApi.Tests
+          workingDirectory: __DOTNET_DIR__
           script: |
             set -euo pipefail
             dotnet test --nologo
