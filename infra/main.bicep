@@ -32,9 +32,19 @@ param solutionUniqueText string = substring(uniqueString(subscription().id, reso
 @description('Optional. Primary Azure region for resource deployment.')
 param location string = resourceGroup().location
 
-@allowed(['australiaeast', 'eastus', 'eastus2', 'francecentral', 'japaneast', 'swedencentral', 'uksouth', 'westus', 'westus3'])
+@allowed([
+  'australiaeast'
+  'eastus'
+  'eastus2'
+  'francecentral'
+  'japaneast'
+  'swedencentral'
+  'uksouth'
+  'westus'
+  'westus3'
+])
 @metadata({
-  azd:{
+  azd: {
     type: 'location'
     usageName: [
       'OpenAI.GlobalStandard.gpt-5.4-mini,100'
@@ -126,7 +136,6 @@ param deployingUserPrincipalType string = 'User'
 // ============================================================================
 // Parameters — App Configuration
 // ============================================================================
-
 
 @description('Optional. Primary title in the web app header.')
 param appTitlePrimary string = 'Contoso'
@@ -298,43 +307,67 @@ output DEPLOYMENT_FLAVOR string = deploymentFlavor
 output DEPLOYMENT_TYPE string = isAvm ? avmDeployment!.outputs.DEPLOYMENT_TYPE : 'N/A'
 
 @description('Name of the dedicated Azure Container Registry.')
-output AZURE_ENV_CONTAINER_REGISTRY_NAME string = isAvm ? avmDeployment!.outputs.AZURE_ENV_CONTAINER_REGISTRY_NAME : bicepDeployment!.outputs.AZURE_ENV_CONTAINER_REGISTRY_NAME
+output AZURE_ENV_CONTAINER_REGISTRY_NAME string = isAvm
+  ? avmDeployment!.outputs.AZURE_ENV_CONTAINER_REGISTRY_NAME
+  : bicepDeployment!.outputs.AZURE_ENV_CONTAINER_REGISTRY_NAME
 
 @description('Login server of the dedicated Azure Container Registry.')
-output AZURE_CONTAINER_REGISTRY_ENDPOINT string = isAvm ? avmDeployment!.outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT : bicepDeployment!.outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT
+output AZURE_CONTAINER_REGISTRY_ENDPOINT string = isAvm
+  ? avmDeployment!.outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT
+  : bicepDeployment!.outputs.AZURE_CONTAINER_REGISTRY_ENDPOINT
 
 @description('Docker image tag used for app deployments.')
-output AZURE_ENV_IMAGE_TAG string = isAvm ? avmDeployment!.outputs.AZURE_ENV_IMAGE_TAG : bicepDeployment!.outputs.AZURE_ENV_IMAGE_TAG
+output AZURE_ENV_IMAGE_TAG string = isAvm
+  ? avmDeployment!.outputs.AZURE_ENV_IMAGE_TAG
+  : bicepDeployment!.outputs.AZURE_ENV_IMAGE_TAG
 
 @description('Cosmos DB account name.')
-output AZURE_COSMOSDB_ACCOUNT string = isAvm ? avmDeployment!.outputs.AZURE_COSMOSDB_ACCOUNT : bicepDeployment!.outputs.AZURE_COSMOSDB_ACCOUNT
+output AZURE_COSMOSDB_ACCOUNT string = isAvm
+  ? avmDeployment!.outputs.AZURE_COSMOSDB_ACCOUNT
+  : bicepDeployment!.outputs.AZURE_COSMOSDB_ACCOUNT
 
 @description('Cosmos DB container name.')
-output AZURE_COSMOSDB_CONVERSATIONS_CONTAINER string = isAvm ? avmDeployment!.outputs.AZURE_COSMOSDB_CONVERSATIONS_CONTAINER : bicepDeployment!.outputs.AZURE_COSMOSDB_CONVERSATIONS_CONTAINER
+output AZURE_COSMOSDB_CONVERSATIONS_CONTAINER string = isAvm
+  ? avmDeployment!.outputs.AZURE_COSMOSDB_CONVERSATIONS_CONTAINER
+  : bicepDeployment!.outputs.AZURE_COSMOSDB_CONVERSATIONS_CONTAINER
 
 @description('Cosmos DB database name.')
-output AZURE_COSMOSDB_DATABASE string = isAvm ? avmDeployment!.outputs.AZURE_COSMOSDB_DATABASE : bicepDeployment!.outputs.AZURE_COSMOSDB_DATABASE
+output AZURE_COSMOSDB_DATABASE string = isAvm
+  ? avmDeployment!.outputs.AZURE_COSMOSDB_DATABASE
+  : bicepDeployment!.outputs.AZURE_COSMOSDB_DATABASE
 
 @description('GPT model deployment name.')
-output AZURE_ENV_GPT_MODEL_NAME string = isAvm ? avmDeployment!.outputs.AZURE_ENV_GPT_MODEL_NAME : bicepDeployment!.outputs.AZURE_ENV_GPT_MODEL_NAME
+output AZURE_ENV_GPT_MODEL_NAME string = isAvm
+  ? avmDeployment!.outputs.AZURE_ENV_GPT_MODEL_NAME
+  : bicepDeployment!.outputs.AZURE_ENV_GPT_MODEL_NAME
 
 @description('Azure OpenAI service endpoint URL.')
-output AZURE_OPENAI_ENDPOINT string = isAvm ? avmDeployment!.outputs.AZURE_OPENAI_ENDPOINT : bicepDeployment!.outputs.AZURE_OPENAI_ENDPOINT
+output AZURE_OPENAI_ENDPOINT string = isAvm
+  ? avmDeployment!.outputs.AZURE_OPENAI_ENDPOINT
+  : bicepDeployment!.outputs.AZURE_OPENAI_ENDPOINT
 
 @description('Embedding model deployment name.')
-output AZURE_ENV_EMBEDDING_DEPLOYMENT_NAME string = isAvm ? avmDeployment!.outputs.AZURE_ENV_EMBEDDING_DEPLOYMENT_NAME : bicepDeployment!.outputs.AZURE_ENV_EMBEDDING_DEPLOYMENT_NAME
+output AZURE_ENV_EMBEDDING_DEPLOYMENT_NAME string = isAvm
+  ? avmDeployment!.outputs.AZURE_ENV_EMBEDDING_DEPLOYMENT_NAME
+  : bicepDeployment!.outputs.AZURE_ENV_EMBEDDING_DEPLOYMENT_NAME
 
 @description('Managed identity client ID for SQL auth.')
-output AZURE_SQLDB_USER_MID string = isAvm ? avmDeployment!.outputs.AZURE_SQLDB_USER_MID : bicepDeployment!.outputs.AZURE_SQLDB_USER_MID
+output AZURE_SQLDB_USER_MID string = isAvm
+  ? avmDeployment!.outputs.AZURE_SQLDB_USER_MID
+  : bicepDeployment!.outputs.AZURE_SQLDB_USER_MID
 
 @description('Backend API managed identity client ID.')
 output API_UID string = isAvm ? avmDeployment!.outputs.API_UID : bicepDeployment!.outputs.API_UID
 
 @description('Azure AI Agent endpoint.')
-output AZURE_AI_AGENT_ENDPOINT string = isAvm ? avmDeployment!.outputs.AZURE_AI_AGENT_ENDPOINT : bicepDeployment!.outputs.AZURE_AI_AGENT_ENDPOINT
+output AZURE_AI_AGENT_ENDPOINT string = isAvm
+  ? avmDeployment!.outputs.AZURE_AI_AGENT_ENDPOINT
+  : bicepDeployment!.outputs.AZURE_AI_AGENT_ENDPOINT
 
 @description('Model deployment name for AI Agent.')
-output AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME string = isAvm ? avmDeployment!.outputs.AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME : bicepDeployment!.outputs.AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME
+output AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME string = isAvm
+  ? avmDeployment!.outputs.AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME
+  : bicepDeployment!.outputs.AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME
 
 @description('Backend API App Service name.')
 output API_APP_NAME string = isAvm ? avmDeployment!.outputs.API_APP_NAME : bicepDeployment!.outputs.API_APP_NAME
@@ -343,7 +376,9 @@ output API_APP_NAME string = isAvm ? avmDeployment!.outputs.API_APP_NAME : bicep
 output API_PID string = isAvm ? avmDeployment!.outputs.API_PID : bicepDeployment!.outputs.API_PID
 
 @description('Backend API managed identity display name.')
-output MID_DISPLAY_NAME string = isAvm ? avmDeployment!.outputs.MID_DISPLAY_NAME : bicepDeployment!.outputs.MID_DISPLAY_NAME
+output MID_DISPLAY_NAME string = isAvm
+  ? avmDeployment!.outputs.MID_DISPLAY_NAME
+  : bicepDeployment!.outputs.MID_DISPLAY_NAME
 
 @description('Frontend web app resource name.')
 output WEB_APP_NAME string = isAvm ? avmDeployment!.outputs.WEB_APP_NAME : bicepDeployment!.outputs.WEB_APP_NAME
@@ -352,58 +387,93 @@ output WEB_APP_NAME string = isAvm ? avmDeployment!.outputs.WEB_APP_NAME : bicep
 output WEB_APP_URL string = isAvm ? avmDeployment!.outputs.WEB_APP_URL : bicepDeployment!.outputs.WEB_APP_URL
 
 @description('Azure AI Search endpoint.')
-output AZURE_AI_SEARCH_ENDPOINT string = isAvm ? avmDeployment!.outputs.AZURE_AI_SEARCH_ENDPOINT : bicepDeployment!.outputs.AZURE_AI_SEARCH_ENDPOINT
+output AZURE_AI_SEARCH_ENDPOINT string = isAvm
+  ? avmDeployment!.outputs.AZURE_AI_SEARCH_ENDPOINT
+  : bicepDeployment!.outputs.AZURE_AI_SEARCH_ENDPOINT
 
 @description('Azure AI Search index name.')
-output AZURE_AI_SEARCH_INDEX string = isAvm ? avmDeployment!.outputs.AZURE_AI_SEARCH_INDEX : bicepDeployment!.outputs.AZURE_AI_SEARCH_INDEX
+output AZURE_AI_SEARCH_INDEX string = isAvm
+  ? avmDeployment!.outputs.AZURE_AI_SEARCH_INDEX
+  : bicepDeployment!.outputs.AZURE_AI_SEARCH_INDEX
 
 @description('Azure AI Search service name.')
-output AZURE_AI_SEARCH_NAME string = isAvm ? avmDeployment!.outputs.AZURE_AI_SEARCH_NAME : bicepDeployment!.outputs.AZURE_AI_SEARCH_NAME
+output AZURE_AI_SEARCH_NAME string = isAvm
+  ? avmDeployment!.outputs.AZURE_AI_SEARCH_NAME
+  : bicepDeployment!.outputs.AZURE_AI_SEARCH_NAME
 
 @description('Search data folder path.')
-output SEARCH_DATA_FOLDER string = isAvm ? avmDeployment!.outputs.SEARCH_DATA_FOLDER : bicepDeployment!.outputs.SEARCH_DATA_FOLDER
+output SEARCH_DATA_FOLDER string = isAvm
+  ? avmDeployment!.outputs.SEARCH_DATA_FOLDER
+  : bicepDeployment!.outputs.SEARCH_DATA_FOLDER
 
 @description('AI Search connection name.')
-output AZURE_AI_SEARCH_CONNECTION_NAME string = isAvm ? avmDeployment!.outputs.AZURE_AI_SEARCH_CONNECTION_NAME : bicepDeployment!.outputs.AZURE_AI_SEARCH_CONNECTION_NAME
+output AZURE_AI_SEARCH_CONNECTION_NAME string = isAvm
+  ? avmDeployment!.outputs.AZURE_AI_SEARCH_CONNECTION_NAME
+  : bicepDeployment!.outputs.AZURE_AI_SEARCH_CONNECTION_NAME
 
 @description('AI Search connection ID.')
-output AZURE_AI_SEARCH_CONNECTION_ID string = isAvm ? avmDeployment!.outputs.AZURE_AI_SEARCH_CONNECTION_ID : bicepDeployment!.outputs.AZURE_AI_SEARCH_CONNECTION_ID
+output AZURE_AI_SEARCH_CONNECTION_ID string = isAvm
+  ? avmDeployment!.outputs.AZURE_AI_SEARCH_CONNECTION_ID
+  : bicepDeployment!.outputs.AZURE_AI_SEARCH_CONNECTION_ID
 
 @description('AI Foundry project endpoint.')
-output AZURE_AI_PROJECT_ENDPOINT string = isAvm ? avmDeployment!.outputs.AZURE_AI_PROJECT_ENDPOINT : bicepDeployment!.outputs.AZURE_AI_PROJECT_ENDPOINT
+output AZURE_AI_PROJECT_ENDPOINT string = isAvm
+  ? avmDeployment!.outputs.AZURE_AI_PROJECT_ENDPOINT
+  : bicepDeployment!.outputs.AZURE_AI_PROJECT_ENDPOINT
 
 @description('AI Foundry resource ID.')
-output AI_FOUNDRY_RESOURCE_ID string = isAvm ? avmDeployment!.outputs.AI_FOUNDRY_RESOURCE_ID : bicepDeployment!.outputs.AI_FOUNDRY_RESOURCE_ID
+output AI_FOUNDRY_RESOURCE_ID string = isAvm
+  ? avmDeployment!.outputs.AI_FOUNDRY_RESOURCE_ID
+  : bicepDeployment!.outputs.AI_FOUNDRY_RESOURCE_ID
 
 @description('AI Foundry project name.')
-output AZURE_AI_PROJECT_NAME string = isAvm ? avmDeployment!.outputs.AZURE_AI_PROJECT_NAME : bicepDeployment!.outputs.AZURE_AI_PROJECT_NAME
+output AZURE_AI_PROJECT_NAME string = isAvm
+  ? avmDeployment!.outputs.AZURE_AI_PROJECT_NAME
+  : bicepDeployment!.outputs.AZURE_AI_PROJECT_NAME
 
 @description('AI Services resource name.')
-output AI_SERVICE_NAME string = isAvm ? avmDeployment!.outputs.AI_SERVICE_NAME : bicepDeployment!.outputs.AI_SERVICE_NAME
+output AI_SERVICE_NAME string = isAvm
+  ? avmDeployment!.outputs.AI_SERVICE_NAME
+  : bicepDeployment!.outputs.AI_SERVICE_NAME
 
 @description('AI Project identity principal ID.')
-output FOUNDRY_PROJECT_PID string = isAvm ? avmDeployment!.outputs.FOUNDRY_PROJECT_PID : bicepDeployment!.outputs.FOUNDRY_PROJECT_PID
+output FOUNDRY_PROJECT_PID string = isAvm
+  ? avmDeployment!.outputs.FOUNDRY_PROJECT_PID
+  : bicepDeployment!.outputs.FOUNDRY_PROJECT_PID
 
 @description('Chat history enabled flag.')
-output USE_CHAT_HISTORY_ENABLED string = isAvm ? avmDeployment!.outputs.USE_CHAT_HISTORY_ENABLED : bicepDeployment!.outputs.USE_CHAT_HISTORY_ENABLED
+output USE_CHAT_HISTORY_ENABLED string = isAvm
+  ? avmDeployment!.outputs.USE_CHAT_HISTORY_ENABLED
+  : bicepDeployment!.outputs.USE_CHAT_HISTORY_ENABLED
 
 @description('Backend runtime stack.')
-output BACKEND_RUNTIME_STACK string = isAvm ? avmDeployment!.outputs.BACKEND_RUNTIME_STACK : bicepDeployment!.outputs.BACKEND_RUNTIME_STACK
+output BACKEND_RUNTIME_STACK string = isAvm
+  ? avmDeployment!.outputs.BACKEND_RUNTIME_STACK
+  : bicepDeployment!.outputs.BACKEND_RUNTIME_STACK
 
 @description('User access token forwarding flag.')
-output USE_USER_ACCESS_TOKEN string = isAvm ? avmDeployment!.outputs.USE_USER_ACCESS_TOKEN : bicepDeployment!.outputs.USE_USER_ACCESS_TOKEN
+output USE_USER_ACCESS_TOKEN string = isAvm
+  ? avmDeployment!.outputs.USE_USER_ACCESS_TOKEN
+  : bicepDeployment!.outputs.USE_USER_ACCESS_TOKEN
 
 @description('The resource ID of the Fabric capacity.')
-output AZURE_FABRIC_CAPACITY_RESOURCE_ID string = isAvm ? avmDeployment!.outputs.AZURE_FABRIC_CAPACITY_RESOURCE_ID : bicepDeployment!.outputs.AZURE_FABRIC_CAPACITY_RESOURCE_ID
+output AZURE_FABRIC_CAPACITY_RESOURCE_ID string = isAvm
+  ? avmDeployment!.outputs.AZURE_FABRIC_CAPACITY_RESOURCE_ID
+  : bicepDeployment!.outputs.AZURE_FABRIC_CAPACITY_RESOURCE_ID
 
 @description('The name of the Fabric capacity resource.')
-output AZURE_FABRIC_CAPACITY_NAME string = isAvm ? avmDeployment!.outputs.AZURE_FABRIC_CAPACITY_NAME : bicepDeployment!.outputs.AZURE_FABRIC_CAPACITY_NAME
+output AZURE_FABRIC_CAPACITY_NAME string = isAvm
+  ? avmDeployment!.outputs.AZURE_FABRIC_CAPACITY_NAME
+  : bicepDeployment!.outputs.AZURE_FABRIC_CAPACITY_NAME
 
 @description('The identities assigned as Fabric Capacity Admin members.')
-output FABRIC_ADMIN_MEMBERS array = isAvm ? avmDeployment!.outputs.FABRIC_ADMIN_MEMBERS : bicepDeployment!.outputs.FABRIC_ADMIN_MEMBERS
+output FABRIC_ADMIN_MEMBERS array = isAvm
+  ? avmDeployment!.outputs.FABRIC_ADMIN_MEMBERS
+  : bicepDeployment!.outputs.FABRIC_ADMIN_MEMBERS
 
 @description('Whether Fabric workspace creation is enabled.')
 output CREATE_FABRIC_WORKSPACE bool = createFabricWorkspace
 
 @description('The Fabric Workspace ID (passed through or empty if auto-creating).')
 output FABRIC_WORKSPACE_ID string = fabricWorkspaceId
+

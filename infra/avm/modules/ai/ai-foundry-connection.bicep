@@ -86,3 +86,4 @@ output connectionName string = connection.name
 
 @description('Connection resource ID.')
 output connectionId string = connection.id
+

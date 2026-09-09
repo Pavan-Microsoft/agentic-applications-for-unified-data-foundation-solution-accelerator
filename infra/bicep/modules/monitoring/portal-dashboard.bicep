@@ -47,3 +47,4 @@ output name string = dashboard.name
 
 @description('Resource group the dashboard was deployed to.')
 output resourceGroupName string = resourceGroup().name
+

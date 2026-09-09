@@ -103,3 +103,4 @@ output fqdn string = containerApp.outputs.fqdn
 
 @description('System-assigned identity principal ID.')
 output principalId string = containerApp.outputs.?systemAssignedMIPrincipalId ?? ''
+

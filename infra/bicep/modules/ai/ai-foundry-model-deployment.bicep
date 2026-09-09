@@ -64,3 +64,4 @@ output name string = modelDeployment.name
 
 @description('Resource ID of the model deployment.')
 output resourceId string = modelDeployment.id
+

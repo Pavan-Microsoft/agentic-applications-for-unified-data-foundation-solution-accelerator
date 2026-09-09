@@ -191,8 +191,12 @@ var deployerInfo = deployer()
 var deployingUserPrincipalId = deployerInfo.objectId
 
 // Container Registry: per-deployment ACR name (registry names: alphanumeric, 5-50 chars)
-var containerRegistryResourceName = !empty(containerRegistryName) ? containerRegistryName : take('cr${solutionSuffix}', 50)
-var createdBy = contains(deployerInfo, 'userPrincipalName') ? split(deployerInfo.userPrincipalName, '@')[0] : deployerInfo.objectId
+var containerRegistryResourceName = !empty(containerRegistryName)
+  ? containerRegistryName
+  : take('cr${solutionSuffix}', 50)
+var createdBy = contains(deployerInfo, 'userPrincipalName')
+  ? split(deployerInfo.userPrincipalName, '@')[0]
+  : deployerInfo.objectId
 var existingTags = resourceGroup().tags ?? {}
 
 var useExistingAIProject = !empty(existingFoundryProjectResourceId)
@@ -245,7 +249,6 @@ module fabricCapacity './modules/fabric/fabric-capacity.bicep' = if (shouldCreat
 // ============================================================================
 var useExistingLogAnalytics = !empty(existingLogAnalyticsWorkspaceId)
 
-
 module log_analytics './modules/monitoring/log-analytics.bicep' = if (!useExistingLogAnalytics) {
   name: take('module.log-analytics.${solutionName}', 64)
   params: {
@@ -258,7 +261,6 @@ module log_analytics './modules/monitoring/log-analytics.bicep' = if (!useExisti
 var logAnalyticsWorkspaceResourceId = useExistingLogAnalytics
   ? existingLogAnalyticsWorkspaceId
   : log_analytics!.outputs.resourceId
-
 
 module app_insights './modules/monitoring/app-insights.bicep' = {
   name: take('module.app-insights.${solutionName}', 64)
@@ -296,11 +298,18 @@ var aiModelDeployments = [
   }
 ]
 
-
-var aiFoundryResourceName = useExistingAIProject ? split(existingFoundryProjectResourceId, '/')[8] : ai_foundry_project!.outputs.name
-var aiProjectResourceName = useExistingAIProject ? split(existingFoundryProjectResourceId, '/')[10] : ai_foundry_project!.outputs.projectName
-var aiFoundrySubscriptionId = useExistingAIProject ? split(existingFoundryProjectResourceId, '/')[2] : subscription().subscriptionId
-var aiFoundryResourceGroupName = useExistingAIProject ? split(existingFoundryProjectResourceId, '/')[4] : resourceGroup().name
+var aiFoundryResourceName = useExistingAIProject
+  ? split(existingFoundryProjectResourceId, '/')[8]
+  : ai_foundry_project!.outputs.name
+var aiProjectResourceName = useExistingAIProject
+  ? split(existingFoundryProjectResourceId, '/')[10]
+  : ai_foundry_project!.outputs.projectName
+var aiFoundrySubscriptionId = useExistingAIProject
+  ? split(existingFoundryProjectResourceId, '/')[2]
+  : subscription().subscriptionId
+var aiFoundryResourceGroupName = useExistingAIProject
+  ? split(existingFoundryProjectResourceId, '/')[4]
+  : resourceGroup().name
 
 // Reference existing AI Foundry project (reads runtime properties: endpoints, identities)
 module existing_project_setup './modules/ai/existing-project-setup.bicep' = if (useExistingAIProject) {
@@ -381,19 +390,21 @@ module foundry_appi_connection './modules/ai/ai-foundry-connection.bicep' = if (
 
 // Model deployments (single loop for both existing and new paths)
 @batchSize(1)
-module model_deployments './modules/ai/ai-foundry-model-deployment.bicep' = [for (deployment, i) in aiModelDeployments: {
-  name: take('module.model-deployment-${i}.${solutionName}', 64)
-  scope: resourceGroup(aiFoundrySubscriptionId, aiFoundryResourceGroupName)
-  params: {
-    aiServicesAccountName: aiFoundryResourceName
-    deploymentName: deployment.name
-    modelName: deployment.model
-    modelVersion: deployment.version
-    raiPolicyName: deployment.raiPolicyName
-    skuName: deployment.sku.name
-    skuCapacity: deployment.sku.capacity
+module model_deployments './modules/ai/ai-foundry-model-deployment.bicep' = [
+  for (deployment, i) in aiModelDeployments: {
+    name: take('module.model-deployment-${i}.${solutionName}', 64)
+    scope: resourceGroup(aiFoundrySubscriptionId, aiFoundryResourceGroupName)
+    params: {
+      aiServicesAccountName: aiFoundryResourceName
+      deploymentName: deployment.name
+      modelName: deployment.model
+      modelVersion: deployment.version
+      raiPolicyName: deployment.raiPolicyName
+      skuName: deployment.sku.name
+      skuCapacity: deployment.sku.capacity
+    }
   }
-}]
+]
 
 module ai_search './modules/ai/ai-search.bicep' = {
   name: take('module.ai-search.${solutionName}', 64)
@@ -404,13 +415,22 @@ module ai_search './modules/ai/ai-search.bicep' = {
   scope: resourceGroup(resourceGroup().name)
 }
 
-
-var aiFoundryEndpoint = useExistingAIProject ? existing_project_setup!.outputs.endpoint : ai_foundry_project!.outputs.endpoint
-var projectEndpoint = useExistingAIProject ? existing_project_setup!.outputs.projectEndpoint : ai_foundry_project!.outputs.projectEndpoint
+var aiFoundryEndpoint = useExistingAIProject
+  ? existing_project_setup!.outputs.endpoint
+  : ai_foundry_project!.outputs.endpoint
+var projectEndpoint = useExistingAIProject
+  ? existing_project_setup!.outputs.projectEndpoint
+  : ai_foundry_project!.outputs.projectEndpoint
 var aiFoundryName = useExistingAIProject ? existing_project_setup!.outputs.name : ai_foundry_project!.outputs.name
-var aiProjectName = useExistingAIProject ? existing_project_setup!.outputs.projectName : ai_foundry_project!.outputs.projectName
-var aiFoundryResourceId = useExistingAIProject ? existing_project_setup!.outputs.resourceId : ai_foundry_project!.outputs.resourceId
-var aiProjectPrincipalId = useExistingAIProject ? existing_project_setup!.outputs.projectIdentityPrincipalId : ai_foundry_project!.outputs.projectIdentityPrincipalId
+var aiProjectName = useExistingAIProject
+  ? existing_project_setup!.outputs.projectName
+  : ai_foundry_project!.outputs.projectName
+var aiFoundryResourceId = useExistingAIProject
+  ? existing_project_setup!.outputs.resourceId
+  : ai_foundry_project!.outputs.resourceId
+var aiProjectPrincipalId = useExistingAIProject
+  ? existing_project_setup!.outputs.projectIdentityPrincipalId
+  : ai_foundry_project!.outputs.projectIdentityPrincipalId
 var aiSearchConnectionId = foundry_search_connection.outputs.connectionId
 
 // ============================================================================
@@ -428,7 +448,6 @@ module storage_account './modules/data/storage-account.bicep' = {
   }
   scope: resourceGroup(resourceGroup().name)
 }
-
 
 module cosmosDBModule './modules/data/cosmos-db-nosql.bicep' = {
   name: take('module.cosmos-db-nosql.${solutionName}', 64)
@@ -487,7 +506,6 @@ var reactAppLayoutConfig = '''{
   }
 }'''
 
-
 module backend_docker './modules/compute/app-service.bicep' = if (backendRuntimeStack == 'python') {
   name: take('module.app-service-pybackend.${solutionName}', 64)
   params: {
@@ -544,7 +562,6 @@ module backend_docker './modules/compute/app-service.bicep' = if (backendRuntime
   scope: resourceGroup(resourceGroup().name)
 }
 
-
 module backend_csapi_docker './modules/compute/app-service.bicep' = if (backendRuntimeStack == 'dotnet') {
   name: take('module.app-service-csbackend.${solutionName}', 64)
   params: {
@@ -582,7 +599,7 @@ module backend_csapi_docker './modules/compute/app-service.bicep' = if (backendR
       DISPLAY_CHART_DEFAULT: 'False'
       APPLICATIONINSIGHTS_CONNECTION_STRING: app_insights.outputs.connectionString
       DUMMY_TEST: 'True'
-      SOLUTION_NAME: solutionSuffix 
+      SOLUTION_NAME: solutionSuffix
       USE_USER_ACCESS_TOKEN: useUserAccessTokenSetting
       APP_ENV: 'Prod'
 
@@ -636,7 +653,9 @@ module role_assignments './modules/identity/role-assignments.bicep' = {
     aiSearchPrincipalId: ai_search.outputs.identityPrincipalId
     deployerPrincipalId: deployingUserPrincipalId
     deployerPrincipalType: deployingUserPrincipalType
-    backendAppServicePrincipalId: backendRuntimeStack == 'python' ? backend_docker!.outputs.identityPrincipalId : backend_csapi_docker!.outputs.identityPrincipalId
+    backendAppServicePrincipalId: backendRuntimeStack == 'python'
+      ? backend_docker!.outputs.identityPrincipalId
+      : backend_csapi_docker!.outputs.identityPrincipalId
     frontendAppServicePrincipalId: frontend_docker.outputs.identityPrincipalId
     containerRegistryResourceId: containerRegistry.outputs.resourceId
     cosmosDbAccountName: cosmosDBModule.outputs.name
@@ -697,7 +716,9 @@ output AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME string = gptModelName
 output API_APP_NAME string = backendRuntimeStack == 'python' ? 'api-${solutionSuffix}' : 'api-cs-${solutionSuffix}'
 
 @description('Backend API managed identity object/principal ID (system-assigned)')
-output API_PID string = backendRuntimeStack == 'python' ? backend_docker!.outputs.identityPrincipalId : backend_csapi_docker!.outputs.identityPrincipalId
+output API_PID string = backendRuntimeStack == 'python'
+  ? backend_docker!.outputs.identityPrincipalId
+  : backend_csapi_docker!.outputs.identityPrincipalId
 
 @description('Backend API App Service name')
 output MID_DISPLAY_NAME string = backendRuntimeStack == 'python' ? 'api-${solutionSuffix}' : 'api-cs-${solutionSuffix}'

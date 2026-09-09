@@ -47,14 +47,16 @@ resource eventHubNamespace 'Microsoft.EventHub/namespaces@2024-01-01' = {
   }
 }
 
-resource eventHubResources 'Microsoft.EventHub/namespaces/eventhubs@2024-01-01' = [for eventhub in eventhubs: {
-  name: eventhub.name
-  parent: eventHubNamespace
-  properties: {
-    messageRetentionInDays: eventhub.?messageRetentionInDays ?? 1
-    partitionCount: eventhub.?partitionCount ?? 2
+resource eventHubResources 'Microsoft.EventHub/namespaces/eventhubs@2024-01-01' = [
+  for eventhub in eventhubs: {
+    name: eventhub.name
+    parent: eventHubNamespace
+    properties: {
+      messageRetentionInDays: eventhub.?messageRetentionInDays ?? 1
+      partitionCount: eventhub.?partitionCount ?? 2
+    }
   }
-}]
+]
 
 // ============================================================================
 // Outputs
@@ -64,3 +66,4 @@ output name string = eventHubNamespace.name
 
 @description('The resource ID of the Event Hub namespace.')
 output resourceId string = eventHubNamespace.id
+

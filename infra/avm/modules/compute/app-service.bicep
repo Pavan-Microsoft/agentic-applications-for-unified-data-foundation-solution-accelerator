@@ -114,9 +114,11 @@ module appService 'br/public:avm/res/web/site:0.23.1' = {
       appCommandLine: appCommandLine
       vnetRouteAllEnabled: vnetRouteAllEnabled
       acrUseManagedIdentityCreds: acrUseManagedIdentityCreds
-      cors: !empty(corsAllowedOrigins) ? {
-        allowedOrigins: corsAllowedOrigins
-      } : null
+      cors: !empty(corsAllowedOrigins)
+        ? {
+            allowedOrigins: corsAllowedOrigins
+          }
+        : null
     }
     e2eEncryptionEnabled: true
     configs: [
@@ -186,4 +188,4 @@ output appUrl string = 'https://${appService.outputs.defaultHostname}'
 
 @description('System-assigned identity principal ID.')
 output identityPrincipalId string = appService.outputs.?systemAssignedMIPrincipalId ?? ''
- 
+

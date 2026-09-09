@@ -50,3 +50,4 @@ output resourceId string = privateEndpoint.outputs.resourceId
 
 @description('Name of the private endpoint.')
 output name string = privateEndpoint.outputs.name
+

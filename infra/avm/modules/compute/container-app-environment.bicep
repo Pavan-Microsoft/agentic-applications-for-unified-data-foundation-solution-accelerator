@@ -97,3 +97,4 @@ output defaultDomain string = managedEnvironment.outputs.defaultDomain
 
 @description('The static IP of the Container Apps Environment.')
 output staticIp string = managedEnvironment.outputs.staticIp
+

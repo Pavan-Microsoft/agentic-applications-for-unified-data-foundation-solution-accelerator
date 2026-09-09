@@ -62,10 +62,12 @@ param privateEndpointSubnetId string = ''
 @description('Private DNS zone resource IDs for PostgreSQL.')
 param privateDnsZoneResourceIds array = []
 
-var privateDnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
-  name: 'dns-zone-${i}'
-  privateDnsZoneResourceId: zoneId
-}]
+var privateDnsZoneConfigs = [
+  for (zoneId, i) in privateDnsZoneResourceIds: {
+    name: 'dns-zone-${i}'
+    privateDnsZoneResourceId: zoneId
+  }
+]
 
 // --- WAF: Redundancy ---
 @description('High availability mode.')
@@ -98,44 +100,54 @@ module postgresServer 'br/public:avm/res/db-for-postgre-sql/flexible-server:0.15
     publicNetworkAccess: publicNetworkAccess
     diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
     managedIdentities: managedIdentities
-    administrators: [for admin in administrators: {
-      objectId: admin.objectId
-      principalName: admin.principalName
-      principalType: admin.principalType
-    }]
-    firewallRules: publicNetworkAccess == 'Enabled' ? [
-      {
-        name: 'AllowAllAzureServicesAndResourcesWithinAzureIps'
-        startIpAddress: '0.0.0.0'
-        endIpAddress: '0.0.0.0'
+    administrators: [
+      for admin in administrators: {
+        objectId: admin.objectId
+        principalName: admin.principalName
+        principalType: admin.principalType
       }
-      {
-        name: 'AllowAll'
-        startIpAddress: '0.0.0.0'
-        endIpAddress: '255.255.255.255'
+    ]
+    firewallRules: publicNetworkAccess == 'Enabled'
+      ? [
+          {
+            name: 'AllowAllAzureServicesAndResourcesWithinAzureIps'
+            startIpAddress: '0.0.0.0'
+            endIpAddress: '0.0.0.0'
+          }
+          {
+            name: 'AllowAll'
+            startIpAddress: '0.0.0.0'
+            endIpAddress: '255.255.255.255'
+          }
+        ]
+      : []
+    privateEndpoints: enablePrivateNetworking
+      ? [
+          {
+            name: 'pep-${name}'
+            customNetworkInterfaceName: 'nic-${name}'
+            subnetResourceId: privateEndpointSubnetId
+            service: 'postgresqlServer'
+            privateDnsZoneGroup: {
+              privateDnsZoneGroupConfigs: privateDnsZoneConfigs
+            }
+          }
+        ]
+      : []
+    databases: [
+      for db in databases: {
+        name: db.name
+        charset: db.?charset ?? 'UTF8'
+        collation: db.?collation ?? 'en_US.utf8'
       }
-    ] : []
-    privateEndpoints: enablePrivateNetworking ? [
-      {
-        name: 'pep-${name}'
-        customNetworkInterfaceName: 'nic-${name}'
-        subnetResourceId: privateEndpointSubnetId
-        service: 'postgresqlServer'
-        privateDnsZoneGroup: {
-          privateDnsZoneGroupConfigs: privateDnsZoneConfigs
-        }
+    ]
+    configurations: [
+      for config in configurations: {
+        name: config.name
+        value: config.value
+        source: config.source
       }
-    ] : []
-    databases: [for db in databases: {
-      name: db.name
-      charset: db.?charset ?? 'UTF8'
-      collation: db.?collation ?? 'en_US.utf8'
-    }]
-    configurations: [for config in configurations: {
-      name: config.name
-      value: config.value
-      source: config.source
-    }]
+    ]
   }
 }
 
@@ -150,3 +162,4 @@ output name string = postgresServer.outputs.name
 
 @description('Resource ID of the PostgreSQL Flexible Server.')
 output resourceId string = postgresServer.outputs.resourceId
+

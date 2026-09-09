@@ -54,10 +54,12 @@ param privateEndpointSubnetId string = ''
 @description('Private DNS zone resource IDs for Cosmos DB (MongoDB).')
 param privateDnsZoneResourceIds array = []
 
-var privateDnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
-  name: 'dns-zone-${i}'
-  privateDnsZoneResourceId: zoneId
-}]
+var privateDnsZoneConfigs = [
+  for (zoneId, i) in privateDnsZoneResourceIds: {
+    name: 'dns-zone-${i}'
+    privateDnsZoneResourceId: zoneId
+  }
+]
 
 // --- WAF: Redundancy ---
 @description('Enable zone redundancy.')
@@ -97,17 +99,19 @@ module cosmosAccount 'br/public:avm/res/document-db/database-account:0.19.0' = {
       networkAclBypass: 'AzureServices'
       publicNetworkAccess: publicNetworkAccess
     }
-    privateEndpoints: enablePrivateNetworking ? [
-      {
-        name: 'pep-${name}'
-        customNetworkInterfaceName: 'nic-${name}'
-        subnetResourceId: privateEndpointSubnetId
-        service: 'MongoDB'
-        privateDnsZoneGroup: {
-          privateDnsZoneGroupConfigs: privateDnsZoneConfigs
-        }
-      }
-    ] : []
+    privateEndpoints: enablePrivateNetworking
+      ? [
+          {
+            name: 'pep-${name}'
+            customNetworkInterfaceName: 'nic-${name}'
+            subnetResourceId: privateEndpointSubnetId
+            service: 'MongoDB'
+            privateDnsZoneGroup: {
+              privateDnsZoneGroupConfigs: privateDnsZoneConfigs
+            }
+          }
+        ]
+      : []
     zoneRedundant: zoneRedundant
     enableAutomaticFailover: enableAutomaticFailover
     managedIdentities: managedIdentities
@@ -139,3 +143,4 @@ output endpoint string = 'https://${name}.mongo.cosmos.azure.com:443/'
 
 @description('Database name.')
 output databaseName string = databaseName
+

@@ -29,7 +29,9 @@ param enableTelemetry bool = true
 @description('Optional. Managed identities for the resource.')
 param managedIdentities object = { systemAssigned: true }
 
-var dcrLogAnalyticsDestinationName = !empty(logAnalyticsWorkspaceName) ? 'la-${logAnalyticsWorkspaceName}-destination' : 'la-${name}-destination'
+var dcrLogAnalyticsDestinationName = !empty(logAnalyticsWorkspaceName)
+  ? 'la-${logAnalyticsWorkspaceName}-destination'
+  : 'la-${name}-destination'
 
 // ============================================================================
 // AVM Module Deployment
@@ -151,3 +153,4 @@ output resourceId string = dataCollectionRule.outputs.resourceId
 
 @description('Name of the data collection rule.')
 output name string = dataCollectionRule.outputs.name
+

@@ -60,3 +60,4 @@ output location string = logAnalytics.location
 
 @description('Log Analytics workspace customer ID.')
 output logAnalyticsWorkspaceId string = logAnalytics.properties.customerId
+

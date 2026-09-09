@@ -60,8 +60,12 @@ param containerRegistryResourceId string = ''
 // ============================================================================
 
 var existingAIFoundryName = useExistingAIProject ? split(existingFoundryProjectResourceId, '/')[8] : ''
-var existingAIFoundrySubscription = useExistingAIProject ? split(existingFoundryProjectResourceId, '/')[2] : subscription().subscriptionId
-var existingAIFoundryResourceGroup = useExistingAIProject ? split(existingFoundryProjectResourceId, '/')[4] : resourceGroup().name
+var existingAIFoundrySubscription = useExistingAIProject
+  ? split(existingFoundryProjectResourceId, '/')[2]
+  : subscription().subscriptionId
+var existingAIFoundryResourceGroup = useExistingAIProject
+  ? split(existingFoundryProjectResourceId, '/')[4]
+  : resourceGroup().name
 
 // ============================================================================
 // Role Definitions
@@ -119,7 +123,10 @@ resource assignOpenAIRoleToAISearch 'Microsoft.Authorization/roleAssignments@202
   scope: aiFoundryAccount
   properties: {
     principalId: aiSearchPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.cognitiveServicesOpenAIUser)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.cognitiveServicesOpenAIUser
+    )
     principalType: 'ServicePrincipal'
   }
 }
@@ -130,8 +137,16 @@ module assignOpenAIToSearchExisting './cross-scope-role-assignment.bicep' = if (
   scope: resourceGroup(existingAIFoundrySubscription, existingAIFoundryResourceGroup)
   params: {
     principalId: aiSearchPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.cognitiveServicesOpenAIUser)
-    roleAssignmentName: guid(solutionName, existingAIFoundryName, aiSearchPrincipalId, roleDefinitions.cognitiveServicesOpenAIUser)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.cognitiveServicesOpenAIUser
+    )
+    roleAssignmentName: guid(
+      solutionName,
+      existingAIFoundryName,
+      aiSearchPrincipalId,
+      roleDefinitions.cognitiveServicesOpenAIUser
+    )
     aiFoundryName: existingAIFoundryName
   }
 }
@@ -154,7 +169,12 @@ module backendAppAiUserExisting './cross-scope-role-assignment.bicep' = if (useE
   params: {
     principalId: backendAppServicePrincipalId
     roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.azureAiUser)
-    roleAssignmentName: guid(solutionName, existingAIFoundryName, backendAppServicePrincipalId, roleDefinitions.azureAiUser)
+    roleAssignmentName: guid(
+      solutionName,
+      existingAIFoundryName,
+      backendAppServicePrincipalId,
+      roleDefinitions.azureAiUser
+    )
     aiFoundryName: existingAIFoundryName
   }
 }
@@ -170,7 +190,10 @@ resource projectSearchReader 'Microsoft.Authorization/roleAssignments@2022-04-01
   scope: aiSearchService
   properties: {
     principalId: aiProjectPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.searchIndexDataReader)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.searchIndexDataReader
+    )
     principalType: 'ServicePrincipal'
   }
 }
@@ -181,7 +204,10 @@ resource projectSearchContributor 'Microsoft.Authorization/roleAssignments@2022-
   scope: aiSearchService
   properties: {
     principalId: aiProjectPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.searchServiceContributor)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.searchServiceContributor
+    )
     principalType: 'ServicePrincipal'
   }
 }
@@ -192,7 +218,10 @@ resource backendAppSearchReaderAssignment 'Microsoft.Authorization/roleAssignmen
   scope: aiSearchService
   properties: {
     principalId: backendAppServicePrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.searchIndexDataReader)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.searchIndexDataReader
+    )
     principalType: 'ServicePrincipal'
   }
 }
@@ -208,7 +237,10 @@ resource projectStorageContributor 'Microsoft.Authorization/roleAssignments@2022
   scope: storageAccount
   properties: {
     principalId: aiProjectPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.storageBlobDataContributor)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.storageBlobDataContributor
+    )
     principalType: 'ServicePrincipal'
   }
 }
@@ -219,7 +251,10 @@ resource projectStorageReader 'Microsoft.Authorization/roleAssignments@2022-04-0
   scope: storageAccount
   properties: {
     principalId: aiProjectPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.storageBlobDataReader)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.storageBlobDataReader
+    )
     principalType: 'ServicePrincipal'
   }
 }
@@ -230,7 +265,10 @@ resource searchStorageReader 'Microsoft.Authorization/roleAssignments@2022-04-01
   scope: storageAccount
   properties: {
     principalId: aiSearchPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.storageBlobDataReader)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.storageBlobDataReader
+    )
     principalType: 'ServicePrincipal'
   }
 }
@@ -261,7 +299,10 @@ resource deployerAiServicesAccess 'Microsoft.Authorization/roleAssignments@2022-
   name: guid(solutionName, aiFoundryAccount.id, deployerPrincipalId, roleDefinitions.cognitiveServicesUser)
   properties: {
     principalId: deployerPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.cognitiveServicesUser)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.cognitiveServicesUser
+    )
     principalType: deployerPrincipalType
   }
 }
@@ -283,7 +324,10 @@ resource deployerSearchIndexContributor 'Microsoft.Authorization/roleAssignments
   name: guid(solutionName, aiSearchService.id, deployerPrincipalId, roleDefinitions.searchIndexDataContributor)
   properties: {
     principalId: deployerPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.searchIndexDataContributor)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.searchIndexDataContributor
+    )
     principalType: deployerPrincipalType
   }
 }
@@ -294,7 +338,10 @@ resource deployerSearchServiceContributor 'Microsoft.Authorization/roleAssignmen
   name: guid(solutionName, aiSearchService.id, deployerPrincipalId, roleDefinitions.searchServiceContributor)
   properties: {
     principalId: deployerPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.searchServiceContributor)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.searchServiceContributor
+    )
     principalType: deployerPrincipalType
   }
 }
@@ -305,7 +352,10 @@ resource deployerStorageBlobContributor 'Microsoft.Authorization/roleAssignments
   name: guid(solutionName, storageAccount.id, deployerPrincipalId, roleDefinitions.storageBlobDataContributor)
   properties: {
     principalId: deployerPrincipalId
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', roleDefinitions.storageBlobDataContributor)
+    roleDefinitionId: subscriptionResourceId(
+      'Microsoft.Authorization/roleDefinitions',
+      roleDefinitions.storageBlobDataContributor
+    )
     principalType: deployerPrincipalType
   }
 }
@@ -337,3 +387,4 @@ resource frontendAppAcrPullAssignment 'Microsoft.Authorization/roleAssignments@2
     principalType: 'ServicePrincipal'
   }
 }
+

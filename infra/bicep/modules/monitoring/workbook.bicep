@@ -58,3 +58,4 @@ output name string = workbook.name
 
 @description('Resource ID of the workbook.')
 output resourceId string = workbook.id
+

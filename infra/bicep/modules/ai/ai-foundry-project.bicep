@@ -110,3 +110,4 @@ output projectEndpoint string = aiProject.properties.endpoints['AI Foundry API']
 
 @description('System-assigned identity principal ID of the project.')
 output projectIdentityPrincipalId string = aiProject.identity.principalId
+

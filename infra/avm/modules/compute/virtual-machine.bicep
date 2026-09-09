@@ -158,3 +158,4 @@ output resourceId string = virtualMachine.outputs.resourceId
 
 @description('Name of the virtual machine.')
 output name string = virtualMachine.outputs.name
+

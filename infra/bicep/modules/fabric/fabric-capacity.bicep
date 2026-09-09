@@ -70,3 +70,4 @@ output resourceGroupName string = resourceGroup().name
 
 @description('The location of the deployed Fabric capacity.')
 output location string = fabricCapacity.location
+

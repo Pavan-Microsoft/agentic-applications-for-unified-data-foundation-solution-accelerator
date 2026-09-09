@@ -80,3 +80,4 @@ output loginServer string = containerRegistry.properties.loginServer
 
 @description('The resource ID of the container registry.')
 output resourceId string = containerRegistry.id
+

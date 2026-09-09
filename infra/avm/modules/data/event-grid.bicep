@@ -63,3 +63,4 @@ output resourceId string = eventGridSystemTopic.outputs.resourceId
 
 @description('System-assigned principal ID (if enabled).')
 output systemAssignedMIPrincipalId string = eventGridSystemTopic.outputs.?systemAssignedMIPrincipalId ?? ''
+

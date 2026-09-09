@@ -55,19 +55,25 @@ param privateDnsZoneResourceIds array = []
 // App Configuration (AVM)
 // ============================================================================
 
-var dnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
-  name: 'config${i}'
-  privateDnsZoneResourceId: zoneId
-}]
-
-var privateEndpointConfig = enablePrivateNetworking && !empty(privateEndpointSubnetId) ? [
-  {
-    subnetResourceId: privateEndpointSubnetId
-    privateDnsZoneGroup: !empty(privateDnsZoneResourceIds) ? {
-      privateDnsZoneGroupConfigs: dnsZoneConfigs
-    } : null
+var dnsZoneConfigs = [
+  for (zoneId, i) in privateDnsZoneResourceIds: {
+    name: 'config${i}'
+    privateDnsZoneResourceId: zoneId
   }
-] : []
+]
+
+var privateEndpointConfig = enablePrivateNetworking && !empty(privateEndpointSubnetId)
+  ? [
+      {
+        subnetResourceId: privateEndpointSubnetId
+        privateDnsZoneGroup: !empty(privateDnsZoneResourceIds)
+          ? {
+              privateDnsZoneGroupConfigs: dnsZoneConfigs
+            }
+          : null
+      }
+    ]
+  : []
 
 module configStore 'br/public:avm/res/app-configuration/configuration-store:0.9.2' = {
   name: take('avm.res.appconfiguration.${name}', 64)
@@ -100,3 +106,4 @@ output endpoint string = configStore.outputs.endpoint
 
 @description('The resource ID of the configuration store.')
 output resourceId string = configStore.outputs.resourceId
+

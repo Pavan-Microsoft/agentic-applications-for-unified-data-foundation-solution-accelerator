@@ -70,10 +70,12 @@ param privateEndpointSubnetId string = ''
 @description('Private DNS zone resource IDs for Storage (blob).')
 param privateDnsZoneResourceIds array = []
 
-var privateDnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
-  name: 'dns-zone-${i}'
-  privateDnsZoneResourceId: zoneId
-}]
+var privateDnsZoneConfigs = [
+  for (zoneId, i) in privateDnsZoneResourceIds: {
+    name: 'dns-zone-${i}'
+    privateDnsZoneResourceId: zoneId
+  }
+]
 
 // --- Role Assignments ---
 @description('Optional. Array of role assignments to create on the Storage Account.')
@@ -105,24 +107,28 @@ module storage 'br/public:avm/res/storage/storage-account:0.32.0' = {
     networkAcls: networkAcls
     managedIdentities: managedIdentities
     blobServices: {
-      containers: [for container in containers: {
-        name: container.name
-        publicAccess: container.publicAccess
-      }]
+      containers: [
+        for container in containers: {
+          name: container.name
+          publicAccess: container.publicAccess
+        }
+      ]
       diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
     }
     diagnosticSettings: !empty(diagnosticSettings) ? diagnosticSettings : []
-    privateEndpoints: enablePrivateNetworking ? [
-      {
-        name: 'pep-${name}'
-        customNetworkInterfaceName: 'nic-${name}'
-        subnetResourceId: privateEndpointSubnetId
-        service: 'blob'
-        privateDnsZoneGroup: {
-          privateDnsZoneGroupConfigs: privateDnsZoneConfigs
-        }
-      }
-    ] : []
+    privateEndpoints: enablePrivateNetworking
+      ? [
+          {
+            name: 'pep-${name}'
+            customNetworkInterfaceName: 'nic-${name}'
+            subnetResourceId: privateEndpointSubnetId
+            service: 'blob'
+            privateDnsZoneGroup: {
+              privateDnsZoneGroupConfigs: privateDnsZoneConfigs
+            }
+          }
+        ]
+      : []
     roleAssignments: !empty(roleAssignments) ? roleAssignments : []
   }
 }
@@ -141,3 +147,4 @@ output blobEndpoint string = storage.outputs.primaryBlobEndpoint
 
 @description('Service endpoints.')
 output serviceEndpoints object = storage.outputs.serviceEndpoints
+

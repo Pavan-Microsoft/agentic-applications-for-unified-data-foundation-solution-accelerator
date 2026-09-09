@@ -45,25 +45,33 @@ param privateDnsZoneResourceIds array = []
 // Event Hub Namespace (AVM)
 // ============================================================================
 
-var eventHubItems = [for eh in eventhubs: {
-  name: eh.name
-  messageRetentionInDays: contains(eh, 'messageRetentionInDays') ? eh.messageRetentionInDays : 1
-  partitionCount: contains(eh, 'partitionCount') ? eh.partitionCount : 2
-}]
-
-var dnsZoneConfigs = [for (zoneId, i) in privateDnsZoneResourceIds: {
-  name: 'config${i}'
-  privateDnsZoneResourceId: zoneId
-}]
-
-var privateEndpointConfig = enablePrivateNetworking && !empty(privateEndpointSubnetId) ? [
-  {
-    subnetResourceId: privateEndpointSubnetId
-    privateDnsZoneGroup: !empty(privateDnsZoneResourceIds) ? {
-      privateDnsZoneGroupConfigs: dnsZoneConfigs
-    } : null
+var eventHubItems = [
+  for eh in eventhubs: {
+    name: eh.name
+    messageRetentionInDays: contains(eh, 'messageRetentionInDays') ? eh.messageRetentionInDays : 1
+    partitionCount: contains(eh, 'partitionCount') ? eh.partitionCount : 2
   }
-] : []
+]
+
+var dnsZoneConfigs = [
+  for (zoneId, i) in privateDnsZoneResourceIds: {
+    name: 'config${i}'
+    privateDnsZoneResourceId: zoneId
+  }
+]
+
+var privateEndpointConfig = enablePrivateNetworking && !empty(privateEndpointSubnetId)
+  ? [
+      {
+        subnetResourceId: privateEndpointSubnetId
+        privateDnsZoneGroup: !empty(privateDnsZoneResourceIds)
+          ? {
+              privateDnsZoneGroupConfigs: dnsZoneConfigs
+            }
+          : null
+      }
+    ]
+  : []
 
 module eventHubNamespace 'br/public:avm/res/event-hub/namespace:0.14.1' = {
   name: take('avm.res.eventhub.namespace.${name}', 64)
@@ -90,3 +98,4 @@ output name string = eventHubNamespace.outputs.name
 
 @description('The resource ID of the Event Hub namespace.')
 output resourceId string = eventHubNamespace.outputs.resourceId
+

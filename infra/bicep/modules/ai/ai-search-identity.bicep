@@ -69,3 +69,4 @@ resource searchServiceUpdate 'Microsoft.Search/searchServices@2025-05-01' = {
 
 @description('The principal ID of the AI Search system-assigned managed identity.')
 output systemAssignedMIPrincipalId string = searchServiceUpdate.identity.principalId
+
