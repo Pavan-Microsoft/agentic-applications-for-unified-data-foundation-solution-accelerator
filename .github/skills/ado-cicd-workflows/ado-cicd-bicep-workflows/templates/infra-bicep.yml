@@ -83,7 +83,7 @@ steps:
               printf '%s' "$CONTENT" > main.parameters.resolved.json
               # Fail fast if substitution produced invalid JSON.
               python3 -c "import json,sys; json.load(open('main.parameters.resolved.json'))" 2>/dev/null \
-                || { echo "Resolved parameters are not valid JSON:"; cat main.parameters.resolved.json; exit 1; }
+                || { echo "Resolved parameters are not valid JSON (see main.parameters.resolved.json)."; exit 1; }
               # Drop any parameter whose value resolved to empty — an unset variable with no
               # ${VAR=default} — so the Bicep template's OWN declared default applies instead of an
               # empty string (which would override the default and be rejected by any @allowed()).

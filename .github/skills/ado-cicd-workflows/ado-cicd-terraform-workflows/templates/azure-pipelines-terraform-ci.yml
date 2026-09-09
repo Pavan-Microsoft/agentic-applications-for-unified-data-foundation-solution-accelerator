@@ -70,7 +70,7 @@ jobs:
           workingDirectory: $(INFRA_TF_DIR)
           script: |
             set -euo pipefail
-            # Init without a backend and without provider network calls, then validate the config.
+            # Init without a backend (providers are still downloaded), then validate the config.
             terraform init -backend=false -input=false
             terraform validate
 

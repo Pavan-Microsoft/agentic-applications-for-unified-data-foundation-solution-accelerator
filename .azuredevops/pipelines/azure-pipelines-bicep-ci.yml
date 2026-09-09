@@ -13,7 +13,6 @@ pr:
   branches:
     include:
       - main
-      - agents-demo
   # No path filter: unit tests must run on any PR, whatever changed (infra or app code).
 
 pool:
@@ -115,7 +114,7 @@ jobs:
           script: |
             set -euo pipefail
             npm ci
-            CI=true npm test
+            CI=true npm test -- --watchAll=false
 
   - job: unit_backend_pytest
     displayName: Unit tests (backend, pytest)
@@ -123,7 +122,7 @@ jobs:
       - checkout: self
       - task: UsePythonVersion@0
         inputs:
-          versionSpec: "3.12"
+          versionSpec: "3.11"
       - task: Bash@3
         displayName: Install and run pytest
         inputs:
@@ -133,7 +132,7 @@ jobs:
             set -euo pipefail
             python -m pip install uv pytest
             [ -f "src/api/python/requirements.txt" ] && uv pip install --system -r "src/api/python/requirements.txt" || true
-            # --ignore=tests/e2e-test keeps the live-app Playwright suite out of this hermetic PR run.
+            # --ignore=tests/e2e-test keeps the live-app e2e suite out of this hermetic PR run.
             pytest --ignore=tests/e2e-test
 
   - job: unit_backend_dotnet

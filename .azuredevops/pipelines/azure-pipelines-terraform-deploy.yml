@@ -1,14 +1,14 @@
 # Azure DevOps — Terraform deploy (apply -> post-deploy + test -> cleanup)
 #
-# Runs on push to the default branch, on a daily schedule, and on manual trigger. It generates a unique resource-group / solution
-# name, applies the Terraform with an ephemeral local backend, runs the post-deploy scripts and
-# tests, and ALWAYS deletes the resource group afterwards (even if apply or tests fail). Nothing is
-# kept running between validations.
+# Runs on push to the default branch, on a daily schedule, and on manual trigger. It generates a
+# unique resource-group / solution name, applies the Terraform with an ephemeral local backend, runs
+# the post-deploy scripts and tests, and ALWAYS deletes the resource group afterwards (even if apply
+# or tests fail). Nothing is kept running between validations.
 #
-# Scheduled an hour after the Bicep deploy pipeline so the same solution is not provisioned twice
-# at the same moment.
+# The schedule is staggered one hour after the Bicep deploy pipeline so the same solution is never
+# provisioned twice at the same moment.
 #
-# Prerequisites (see the skill's references/service-connection-setup.md):
+# Prerequisites:
 #   - Service connection:  set in the SERVICE_CONNECTION variable (Azure Resource Manager).
 #   - Variable group 'terraform-deploy' linked below, containing AZURE_SUBSCRIPTION_ID,
 #     AZURE_LOCATION, ENV_PREFIX, and every required TF variable as TF_VAR_<name>.
@@ -67,8 +67,8 @@ stages:
               terraformVersion: $(TF_VERSION)
 
   # >>> POST-DEPLOY + TEST STAGE <<<
-  # Reads live values from the published Terraform outputs, runs the discovered post-deploy
-  # scripts, then runs the Playwright e2e suite.
+  # Reads live values from the provisioned resource group (here, the published Terraform outputs),
+  # runs the discovered post-deploy scripts, then runs the Playwright e2e suite.
   - template: azure-pipelines-post-deploy.yml
     parameters:
       serviceConnection: $(SERVICE_CONNECTION)
