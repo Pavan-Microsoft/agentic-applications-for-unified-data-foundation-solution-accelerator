@@ -30,11 +30,14 @@ writing any files.
 | **VS Code + GitHub Copilot Chat** | Hosts the custom agent | Agent dropdown lists custom agents |
 | **jq** | The discovery scripts parse and emit JSON | `jq --version` |
 | **Bash** | Runs the bundled skill scripts | `bash --version` |
+| **git** | Detects the repository root during discovery | `git --version` |
+| **grep** | Scans files during discovery | `grep --version` |
+| **find** | Scans files during discovery | `find --version` |
 | **Terraform** CLI *(optional)* | Only for Terraform repositories, during local validation | `terraform version` |
 
 The agent runs `check-prereqs.sh` and reports anything missing — it does **not** install tools for
-you. Only `jq` and Bash are required to generate the YAML; `terraform` is needed only for the
-optional local validation of Terraform repositories.
+you. `jq`, Bash, `git`, `grep`, and `find` are required to generate the YAML; `terraform` is needed
+only for the optional local validation of Terraform repositories.
 
 ### Repository
 
@@ -50,33 +53,50 @@ skills:
 | Path | Purpose |
 |---|---|
 | `.github/agents/ado-cicd-workflows.agent.md` | Registers the custom agent |
-| `.github/skills/ado-cicd-bicep-workflows/` | Bicep CI/CD pipeline generator skill |
-| `.github/skills/ado-cicd-terraform-workflows/` | Terraform CI/CD pipeline generator skill |
-| `.github/skills/ado-cicd-post-deploy/` | Post-deploy / application-deploy + tests skill |
+| `.github/skills/ado-cicd-workflows/ado-cicd-bicep-workflows/` | Bicep CI/CD pipeline generator skill |
+| `.github/skills/ado-cicd-workflows/ado-cicd-terraform-workflows/` | Terraform CI/CD pipeline generator skill |
+| `.github/skills/ado-cicd-workflows/ado-cicd-post-deploy/` | Post-deploy / application-deploy + tests skill |
+| `.vscode/settings.json` (`chat.agentSkillsLocations`) | Registers `.github/skills/ado-cicd-workflows` so the grouped skills are discovered |
+
+The three skills are grouped under a single `ado-cicd-workflows/` folder, so that folder must be
+registered as a skills location (see the note below).
 
 The resulting layout in the target repository is:
 
 ```
 <target-repository>/
+├── .vscode/
+│   └── settings.json                          # registers .github/skills/ado-cicd-workflows
 └── .github/
     ├── agents/
     │   └── ado-cicd-workflows.agent.md
     └── skills/
-        ├── ado-cicd-bicep-workflows/
-        │   ├── SKILL.md
-        │   ├── references/
-        │   ├── scripts/          # check-prereqs.sh, inspect-repo.sh, validate-pipelines.sh
-        │   └── templates/        # azure-pipelines-bicep-ci.yml, -deploy.yml, infra-bicep.yml
-        ├── ado-cicd-terraform-workflows/
-        │   ├── SKILL.md
-        │   ├── references/
-        │   ├── scripts/          # check-prereqs.sh, inspect-repo-tf.sh, validate-pipelines.sh
-        │   └── templates/        # azure-pipelines-terraform-ci.yml, -deploy.yml, infra-terraform.yml
-        └── ado-cicd-post-deploy/
-            ├── SKILL.md
-            ├── references/
-            ├── scripts/          # check-prereqs.sh, inspect-post-deploy.sh, discover-tests.sh, validate-pipelines.sh
-            └── templates/        # azure-pipelines-post-deploy.yml
+        └── ado-cicd-workflows/                # grouping folder (registered in settings.json)
+            ├── ado-cicd-bicep-workflows/
+            │   ├── SKILL.md
+            │   ├── references/
+            │   ├── scripts/          # check-prereqs.sh, inspect-repo.sh, validate-pipelines.sh
+            │   └── templates/        # azure-pipelines-bicep-ci.yml, -deploy.yml, infra-bicep.yml
+            ├── ado-cicd-terraform-workflows/
+            │   ├── SKILL.md
+            │   ├── references/
+            │   ├── scripts/          # check-prereqs.sh, inspect-repo-tf.sh, validate-pipelines.sh
+            │   └── templates/        # azure-pipelines-terraform-ci.yml, -deploy.yml, infra-terraform.yml
+            └── ado-cicd-post-deploy/
+                ├── SKILL.md
+                ├── references/
+                ├── scripts/          # check-prereqs.sh, inspect-post-deploy.sh, discover-tests.sh, validate-pipelines.sh
+                └── templates/        # azure-pipelines-post-deploy.yml
+```
+
+The `.vscode/settings.json` must register the grouping folder:
+
+```json
+{
+    "chat.agentSkillsLocations": {
+        ".github/skills/ado-cicd-workflows": true
+    }
+}
 ```
 
 Then:
