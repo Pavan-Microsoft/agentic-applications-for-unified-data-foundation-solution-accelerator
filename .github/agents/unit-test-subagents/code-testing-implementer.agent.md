@@ -72,7 +72,7 @@ These rules apply to every language and override any pattern an existing test fi
 - **Do not modify non-test source files.** If a class, method, or symbol is hard to test (sealed, internal, no seam, tightly coupled), record the gap in `.testagent/plan.md` as a follow-up. Do not edit production code to make it testable as part of test generation — that is the scope of the `testability-migration` agent, not this one.
 - **Never revert or clean the working tree.** Do not run `git checkout`, `git restore`, `git reset`, `git clean`, `git stash`, `git rm`, or delete tracked files. Generate tests against the workspace exactly as delivered, even if the source looks synthetic, deleted, gutted, or incomplete — that state is intentional, not corruption.
 - **Prefer new test files over edits to existing ones** when both options are equally valid (e.g., a new feature, a separate concern, or any case where the existing file isn't strictly required). A new file is always purely additive.
-- **One exception**: build-system manifests (`.csproj`/`.sln`/`packages.config`/`pom.xml`/`build.gradle`/`Cargo.toml`/`package.json`/etc.) may be edited when registering a new test file/project or adding a missing test dependency. Keep these edits minimal and limited to the registration/dependency change. Never convert `packages.config` to `PackageReference`, convert a classic project to SDK style, or upgrade the test stack unless the user explicitly requested that migration.
+- **One exception**: build-system manifests (`.csproj`/`.sln`/`packages.config`/`pyproject.toml`/`setup.cfg`/`setup.py`/`requirements*.txt`/etc.) may be edited when registering a new test file/project or adding a missing test dependency. Keep these edits minimal and limited to the registration/dependency change. Never convert `packages.config` to `PackageReference`, convert a classic project to SDK style, or upgrade the test stack unless the user explicitly requested that migration.
 
 #### Test depth (cross-language invariants)
 
@@ -106,12 +106,12 @@ Tests that pass via your *scoped* build/test command but are invisible to a gene
 
 - A new C# test project that was never `dotnet sln add`ed: passes locally, invisible to the solution-level harness.
 - A new C# test file added beside a classic non-SDK project but omitted from its `<Compile Include>` items: visible on disk, never compiled or discovered.
-- A Pester test file placed under a custom directory (`pester/`, `tst/`): passes when you pass `-Path` explicitly, invisible to the default `Invoke-Pester` the harness runs.
-- An RSpec spec placed in a sub-gem's `spec/` dir of a monorepo: passes via `bundle exec rspec <subdir>/spec`, invisible to `bundle exec rspec` from the repo root.
+- A new Python test file placed outside `pytest`'s configured `testpaths` (or matching a non-default `python_files` pattern): passes when you pass its path explicitly, invisible to bare `pytest` from the repo root.
+- A Python test module that raises `ImportError` at collection time (missing dependency, wrong `sys.path`, or circular import): the module is silently skipped by `pytest --collect-only`, so its tests never run.
 
 Read the **"Harness Discovery Check"** section in your language's extension file and run the command it specifies *from the repo root* (not from the test project / sub-gem directory). Compute the delta against the initial test count you captured in Step 2. If the delta does not match what you generated, fix the root cause — registration, placement, or harness configuration — and re-run. **Do not proceed to Step 8 until the harness-equivalent command sees your new tests.**
 
-If your language extension has no "Harness Discovery Check" section, use the canonical default-discovery command for the test framework (`pytest --collect-only -q | tail -n 1`, `npx vitest --reporter=verbose --run 2>&1 | grep -E '^\s*[√×]'` from repo root, `go test -list '.*' ./...`, `mvn test -DskipTests=false -Dtest.failure.ignore=true`, etc.) and apply the same delta logic.
+If your language extension has no "Harness Discovery Check" section, use the canonical default-discovery command for the test framework (`pytest --collect-only -q` for Python, `dotnet test --list-tests` for .NET) and apply the same delta logic.
 
 ### 8. Format Code (Optional)
 

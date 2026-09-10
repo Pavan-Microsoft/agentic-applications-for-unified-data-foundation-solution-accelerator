@@ -21,11 +21,7 @@ risk-ranked table in `SKILL.md`.
 | Language family | Meaningful candidates |
 |---|---|
 | C#/.NET | Remove null/range guards; change exception type; replace `??` fallback; change null-conditional access; return `default`; alter async cancellation/error propagation |
-| Rust | Replace `?` with `unwrap()`/`expect()`; swap `Ok`/`Err` or `Some`/`None`; remove `if let`/`match` arm; change inclusive range; alter error mapping |
-| Go | Remove or swallow a meaningful `err` branch; change wrapped error; alter `(value, err)` result. Do not flag a bare idiomatic passthrough unless behavior changes |
-| Python | Remove `raise`; change exception type; replace `None` fallback; alter truthiness/boundary checks |
-| TypeScript/JavaScript | Remove rejected-promise/error path; alter nullish coalescing; confuse truthiness with exact value; skip awaited behavior |
-| Java/Kotlin | Remove validation/exception; change nullable/default handling; alter collection or stream predicate |
+| Python | Remove `raise`; change exception type; replace `None` fallback; alter truthiness/boundary checks; drop `await` from an async call; alter `except` clause type |
 
 When framework-specific test discovery or assertion APIs are unclear, invoke
 `test-analysis-extensions` and read only the matching language extension.

@@ -57,7 +57,7 @@ When the task specifies particular test scenarios or behaviors to cover:
 
 ## Write Tests That Pin Down Behavior
 
-A test that passes coincidentally gives a false signal. Beyond covering code, every test must *pin down behavior* — it should fail under a plausible bug. These principles are language-agnostic (MSTest, xUnit, NUnit, pytest, Jest, Go `testing`, JUnit, RSpec, ...):
+A test that passes coincidentally gives a false signal. Beyond covering code, every test must *pin down behavior* — it should fail under a plausible bug. These principles apply to both supported ecosystems (MSTest, xUnit, NUnit, TUnit, pytest, unittest):
 
 - **Mutation thinking** — each assertion should fail under at least one plausible mutation (`>`→`>=`, `&&`→`||`, a dropped null/`None`/`nil` check, an off-by-one, returning the input unchanged). If it survives every mutation, replace weak checks (`IsNotNull`/`toBeDefined`) with a concrete expected value.
 - **No tautologies** — never assert that a value you just wrote reads back unchanged; assert on the *transformation* the code performs, not that storage works.
@@ -126,30 +126,6 @@ public sealed class CalculatorTests
         Assert.ThrowsException<DivideByZeroException>(() => _sut.Divide(10, 0));
     }
 }
-```
-
-### TypeScript (Jest)
-
-```typescript
-describe("Calculator", () => {
-  let sut: Calculator;
-
-  beforeEach(() => {
-    sut = new Calculator();
-  });
-
-  it.each([
-    [2, 3, 5],
-    [-1, 1, 0],
-    [0, 0, 0],
-  ])("add(%i, %i) returns %i", (a, b, expected) => {
-    expect(sut.add(a, b)).toBe(expected);
-  });
-
-  it("divide by zero throws error", () => {
-    expect(() => sut.divide(10, 0)).toThrow("Division by zero");
-  });
-});
 ```
 
 ### Python (pytest)
