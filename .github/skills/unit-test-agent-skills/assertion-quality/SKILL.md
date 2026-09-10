@@ -1,14 +1,14 @@
 ---
 name: assertion-quality
-description: "Report assertion quality in existing tests. ALWAYS USE for weak, shallow, trivial, always-true, self-referential, assertion-free, presence/truthiness-only, or insufficiently diverse assertions. Polyglot. DO NOT USE for direct fixes: writing-mstest-tests owns supplied MSTest assertions; code-testing-agent owns new cases. Use test-gap-analysis for mutation reasoning and test-anti-patterns for general severity-ranked audits."
+description: "Report assertion quality in existing tests. ALWAYS USE for weak, shallow, trivial, always-true, self-referential, assertion-free, presence/truthiness-only, or insufficiently diverse assertions. Supports .NET and Python. DO NOT USE for direct fixes: writing-mstest-tests owns supplied MSTest assertions; code-testing-agent owns new cases. Use test-gap-analysis for mutation reasoning and test-anti-patterns for general severity-ranked audits."
 license: MIT
 ---
 
 # Assertion Diversity Analysis
 
-Analyze test code in any supported language to measure how varied and meaningful the assertions are. Produce a metrics report that reveals whether tests verify different facets of correctness — not just "output equals X" but also structure, exceptions, state transitions, side effects, and invariants.
+Analyze test code in .NET or Python to measure how varied and meaningful the assertions are. Produce a metrics report that reveals whether tests verify different facets of correctness — not just "output equals X" but also structure, exceptions, state transitions, side effects, and invariants.
 
-> **Language-specific guidance**: Call the `test-analysis-extensions` skill to discover available extension files, then read the file matching the target codebase's language and framework (e.g., `dotnet.md` for .NET, `python.md` for pytest, `typescript.md` for Jest, `go.md` for the standard `testing` package). You MUST read the relevant extension file before classifying assertions, because assertion APIs differ significantly across frameworks.
+> **Language-specific guidance**: Call the `test-analysis-extensions` skill to discover available extension files, then read the file matching the target codebase's language and framework (`dotnet.md` for .NET/MSTest/xUnit/NUnit/TUnit, `python.md` for pytest/unittest). You MUST read the relevant extension file before classifying assertions, because assertion APIs differ significantly across frameworks.
 
 ## Why Assertion Diversity Matters
 
@@ -50,11 +50,11 @@ Low assertion diversity signals shallow testing. Tests may pass while bugs hide 
 
 ### Step 1: Detect language and load extension
 
-Identify the target codebase's language and test framework. Call the `test-analysis-extensions` skill and read the matching extension file (e.g., `extensions/dotnet.md` for .NET, `extensions/python.md` for pytest, `extensions/typescript.md` for Jest/Vitest, `extensions/go.md` for Go). The extension file lists the framework-specific assertion APIs you will classify in Step 3.
+Identify the target codebase's language and test framework. Call the `test-analysis-extensions` skill and read the matching extension file (`extensions/dotnet.md` for .NET/MSTest/xUnit/NUnit/TUnit, `extensions/python.md` for pytest/unittest). If the codebase is not .NET or Python, decline the analysis and report that only .NET and Python are supported. The extension file lists the framework-specific assertion APIs you will classify in Step 3.
 
 ### Step 2: Gather the test code
 
-Read all test files the user provides. If the user points to a directory or project, scan for all test files using the markers in the language extension file (e.g., `[TestMethod]` for MSTest, `def test_*` for pytest, `it()` / `test()` for Jest, `func TestXxx` for Go).
+Read all test files the user provides. If the user points to a directory or project, scan for all test files using the markers in the language extension file (e.g., `[TestMethod]` / `[Fact]` / `[Test]` for .NET, `def test_*` / `class Test*` for pytest/unittest).
 
 ### Step 3: Classify every assertion
 
@@ -62,20 +62,20 @@ For each test method, identify all assertions and classify them into these langu
 
 | Category | What it verifies | Examples across languages |
 |----------|------------------|----------------------------|
-| **Equality** | Return value matches expected | `Assert.AreEqual` (MSTest), `Assert.Equal` (xUnit), `assert x == y` (pytest), `expect(x).toBe(y)` (Jest), `assertEquals` (JUnit), `if got != want { t.Error... }` / `assert.Equal(t, want, got)` (Go), `x shouldBe y` (Kotest), `Should -Be` (Pester), `EXPECT_EQ` (GoogleTest) |
-| **Boolean** | Condition holds | `Assert.IsTrue`, `assert flag` (Python), `expect(x).toBeTruthy()` (Jest), `assertTrue` (JUnit), `assert.True(t, ok)` (testify), `x.shouldBeTrue()` (Kotest), `Should -BeTrue` (Pester), `EXPECT_TRUE` |
-| **Null / None / Nil** | Presence/absence of value | `Assert.IsNull` (.NET), `assert x is None` (pytest), `expect(x).toBeNull()` (Jest), `assertNull` (JUnit), `assert.Nil(t, v)` (testify), `XCTAssertNil` (XCTest), `Should -BeNullOrEmpty` (Pester) |
-| **Exception / Error** | Error handling behavior | `Assert.Throws<T>()`, `pytest.raises(E)`, `expect(fn).toThrow(E)`, `assertThrows<E>`, `assert.Error(t, err)` / `assert.ErrorIs`, `#[should_panic]` (Rust), `XCTAssertThrowsError`, `Should -Throw`, `EXPECT_THROW` |
-| **Type checks** | Runtime type correctness | `Assert.IsInstanceOfType`, `assert isinstance(x, T)`, `expect(x).toBeInstanceOf(T)`, `assertInstanceOf`, `assert.IsType(t, T{}, v)`, `assert!(matches!(value, Pattern))` (Rust), `Should -BeOfType` |
-| **String** | Text content and format | `StringAssert.Contains`, `assert sub in s`, `expect(s).toMatch(/x/)`, `assertTrue(s.contains(...))`, `assert.Contains(t, s, sub)`, `s shouldContain sub`, `Should -Match`, `EXPECT_THAT(s, HasSubstr(...))` |
-| **Collection** | Collection contents and structure | `CollectionAssert.Contains`, `assert item in collection`, `expect(arr).toContain(x)`, `assertIterableEquals`, `assert.Contains(t, slice, item)`, `col shouldContainExactly listOf(...)`, `Should -Contain`, `EXPECT_THAT(c, ElementsAre(...))` |
-| **Comparison** | Ordering and magnitude | `Assert.IsTrue(x > y)`, `Is.GreaterThan`, `assert x > y`, `expect(x).toBeGreaterThan(y)`, `assertTrue(x > y)`, `assert.Greater(t, x, y)` (testify) |
-| **Approximate** | Floating-point or tolerance-based | `Assert.AreEqual(expected, actual, delta)`, `pytest.approx(y)`, `expect(x).toBeCloseTo(y)`, `assertEquals(x, y, delta)`, `assert.InDelta(t, x, y, delta)`, `EXPECT_NEAR`, `EXPECT_DOUBLE_EQ` |
-| **Negative** | What should NOT happen | `Assert.AreNotEqual`, `assert x != y`, `expect(x).not.toBe(y)`, `assertNotEquals`, `assert.NotEqual(t, x, y)`, `refute` (Minitest / Ruby), `Should -Not -Be` |
-| **State / Side-effect** | State transitions and side effects | Assertions on object properties after mutation; mock-call verifications: `mock.Verify(...)` (Moq), `mock_method.assert_called_with(...)` (Python `unittest.mock`), `expect(mock).toHaveBeenCalledWith(...)` (Jest), `verify(mock).method(...)` (Mockito), `Should -Invoke` (Pester), `expect { code }.to change(obj, :attr)` (RSpec) |
-| **Structural / Deep** | Deep object correctness | `Assert.AreEqual` with rich-equality types, `assertThat(obj).usingRecursiveComparison()` (AssertJ), `.toEqual({...})` (Jest deep equality), `cmp.Diff` (Go go-cmp), snapshot tests (`.toMatchSnapshot()`, `syrupy`, `SnapshotTesting`), `assertThat(col).extracting(...)` (AssertJ chains) |
+| **Equality** | Return value matches expected | `Assert.AreEqual` (MSTest), `Assert.Equal` (xUnit), `Is.EqualTo` (NUnit), `assert x == y` (pytest), `self.assertEqual` (unittest) |
+| **Boolean** | Condition holds | `Assert.IsTrue`, `Assert.True`, `Is.True`, `assert flag` (pytest), `self.assertTrue` (unittest) |
+| **Null / None** | Presence/absence of value | `Assert.IsNull` / `Assert.IsNotNull` (.NET), `assert x is None` / `assert x is not None` (pytest), `self.assertIsNone` (unittest) |
+| **Exception / Error** | Error handling behavior | `Assert.ThrowsException<T>()` (MSTest), `Assert.Throws<T>()` (xUnit), `Assert.That(..., Throws.TypeOf<T>())` (NUnit), `pytest.raises(E)`, `self.assertRaises` (unittest) |
+| **Type checks** | Runtime type correctness | `Assert.IsInstanceOfType`, `Is.InstanceOf<T>()`, `assert isinstance(x, T)`, `self.assertIsInstance` |
+| **String** | Text content and format | `StringAssert.Contains`, `Does.Contain`, `assert sub in s`, `self.assertIn(sub, s)`, `re.search(pattern, s)` in a bare assert |
+| **Collection** | Collection contents and structure | `CollectionAssert.Contains`, `Assert.Contains` (xUnit), `Has.Member` (NUnit), `assert item in collection`, `self.assertIn(item, coll)`, `self.assertCountEqual` |
+| **Comparison** | Ordering and magnitude | `Assert.IsTrue(x > y)`, `Is.GreaterThan`, `assert x > y`, `self.assertGreater` |
+| **Approximate** | Floating-point or tolerance-based | `Assert.AreEqual(expected, actual, delta)`, `Is.EqualTo(x).Within(delta)`, `pytest.approx(y)`, `self.assertAlmostEqual` |
+| **Negative** | What should NOT happen | `Assert.AreNotEqual`, `Is.Not.EqualTo`, `assert x != y`, `self.assertNotEqual` |
+| **State / Side-effect** | State transitions and side effects | Assertions on object properties after mutation; mock-call verifications: `mock.Verify(...)` (Moq), `Received()` (NSubstitute), `A.CallTo(...).MustHaveHappened()` (FakeItEasy), `mock_method.assert_called_with(...)` / `assert_called_once_with` (`unittest.mock`), `MagicMock().assert_awaited_with` (`pytest-asyncio`) |
+| **Structural / Deep** | Deep object correctness | Rich-equality types with `Assert.AreEqual`, `Assert.Equivalent` (xUnit), fluent-assertions `Should().BeEquivalentTo`, `dict1 == dict2` deep compare in pytest, `syrupy` / snapshot fixtures |
 
-A single assertion can belong to multiple categories (e.g., `Assert.AreNotEqual` is both Equality and Negative; `expect(mock).toHaveBeenCalledWith(...)` is both State/Side-effect and a specific-call assertion).
+A single assertion can belong to multiple categories (e.g., `Assert.AreNotEqual` is both Equality and Negative; `mock.Verify(m => m.Method(...))` is both State/Side-effect and a specific-call assertion).
 
 Read the loaded language extension file for the exact framework-specific list of assertion APIs.
 
@@ -109,18 +109,13 @@ Before reporting, calibrate findings:
   meaningful, name the behavior it pins. If you cannot give such a
   counterexample from the test and available production contract, do not
   speculate that the assertion is weak.
-- **Trivial means truly trivial.** A null/None/nil check alone is trivial (`Assert.IsNotNull(result)`, `assert result is not None`, `expect(x).toBeDefined()`). But a null check followed by a meaningful value assertion is not trivial — the null check is a guard before the real assertion. Only flag a test as "trivial" if it has no meaningful value assertions.
-- **Use exact Jest semantics.** `toBeDefined()` rejects only `undefined`;
-  `null` does satisfy it, but mention that only when `null` is a realistic
-  contract-breaking result. `toMatchObject(expected)` verifies the expected
-  subset structurally; it neither proves object identity nor full-object
-  equality. Never claim that it does.
-- **Boolean assertions checking meaningful conditions are not trivial.** `Assert.IsTrue(result.IsValid)` / `assert result.is_valid` / `expect(result.isValid).toBe(true)` check a specific property — these are Boolean assertions, not trivial ones. Always-true assertions (`Assert.IsTrue(true)`, `assert True`, `expect(true).toBe(true)`) are trivial.
+- **Trivial means truly trivial.** A null/None check alone is trivial (`Assert.IsNotNull(result)`, `assert result is not None`). But a null check followed by a meaningful value assertion is not trivial — the null check is a guard before the real assertion. Only flag a test as "trivial" if it has no meaningful value assertions.
+- **Boolean assertions checking meaningful conditions are not trivial.** `Assert.IsTrue(result.IsValid)` / `assert result.is_valid` check a specific property — these are Boolean assertions, not trivial ones. Always-true assertions (`Assert.IsTrue(true)`, `assert True`) are trivial.
 - **Consider the test's intent.** A test for a void method that verifies state change on a dependency is legitimate even if it only uses one Boolean assertion.
-- **Exception tests are inherently low-assertion-count.** `Assert.ThrowsException<T>(() => ...)` / `with pytest.raises(E): ...` / `expect(fn).toThrow(E)` / `#[should_panic]` may be the only assertion — that's fine for exception-focused tests. Don't penalize them for low assertion count.
-- **Mock-call verifications and bare assertion forms count.** Treat `verify(mock).method(...)` (Mockito), `expect(mock).toHaveBeenCalledWith(...)` (Jest), `Should -Invoke` (Pester), `bare assert` (pytest), `if got != want { t.Errorf(...) }` (Go) all as real assertions of the appropriate category. Do not treat them as missing-framework-API smells.
-- **Snapshot assertions** (`.toMatchSnapshot()`, `syrupy`, `SnapshotTesting`) count as Structural/Deep assertions. Flag stale or never-updated snapshots separately.
-- **Property-based tests** (`@given` Hypothesis, `proptest!`, `forAll` Kotest) generate assertions implicitly through generated cases — count the inner assertion logic, not the outer scaffold.
+- **Exception tests are inherently low-assertion-count.** `Assert.ThrowsException<T>(() => ...)` / `with pytest.raises(E): ...` may be the only assertion — that's fine for exception-focused tests. Don't penalize them for low assertion count.
+- **Mock-call verifications and bare assertion forms count.** Treat `mock.Verify(...)` (Moq), `Received()` (NSubstitute), `mock.assert_called_with(...)` (unittest.mock), and bare `assert` (pytest) all as real assertions of the appropriate category. Do not treat them as missing-framework-API smells.
+- **Snapshot assertions** (`syrupy` in pytest, verified-file snapshot libraries in .NET) count as Structural/Deep assertions. Flag stale or never-updated snapshots separately.
+- **Property-based tests** (`@given` Hypothesis in pytest, `FsCheck` / property tests in .NET) generate assertions implicitly through generated cases — count the inner assertion logic, not the outer scaffold.
 - **Don't conflate diversity with volume.** A test with 20 equality assertions has high volume but low diversity. A test with one equality, one null check, and one exception assertion has low volume but good diversity.
 - **Self-referential assertions are not meaningful equality checks.** Asserting that an output equals an input round-trip looks like a real equality assertion but is tautological when the operation under test is expected to be identity. Flag these separately from normal equality assertions. If the test's *purpose* is to verify a round-trip (serialize/deserialize, encode/decode), the assertion is valid — but it should be accompanied by assertions on non-trivial inputs that exercise the transformation.
 - **If assertions are well-diversified, say so.** A report concluding the suite has good diversity is perfectly valid.
@@ -176,8 +171,6 @@ Present the analysis in this structure:
 - [ ] Boolean assertions on meaningful properties are not classified as trivial
 - [ ] Every weak-assertion claim includes a realistic counterexample that the
       exact matcher would accept
-- [ ] Jest matcher semantics are precise (`toBeDefined` versus `undefined`;
-      `toMatchObject` subset matching versus identity/full equality)
 - [ ] Recommendations are concrete (name specific test methods and suggest specific assertion types)
 - [ ] If the suite has good diversity, the report acknowledges this
 
@@ -186,11 +179,11 @@ Present the analysis in this structure:
 | Pitfall | Solution |
 |---------|----------|
 | Penalizing exception tests for low assertion count | Exception assertions are complete on their own — skip count warnings for these |
-| Flagging null/None/nil checks before value checks as trivial | Only flag tests where the null/None/nil check is the ONLY assertion |
-| Counting any Boolean assertion as trivial | Only always-true assertions (`Assert.IsTrue(true)`, `assert True`, `expect(true).toBe(true)`) are trivial |
-| Ignoring framework differences | Each framework has distinct assertion APIs — always read the matching language extension first. MSTest's `Assert.AreEqual`, xUnit's `Assert.Equal`, NUnit's `Is.EqualTo`, pytest's bare `assert ==`, Jest's `expect().toBe()`, Go's `if … { t.Error… }` all map to the **Equality** category |
-| Treating bare assertion forms as missing-framework | Bare `assert` (pytest), `if got != want { t.Error... }` (Go), and `assert!()` (Rust) are canonical — count them in the right category |
-| Treating mock-call verifications as assertion-free | `verify(mock).method(...)`, `expect(mock).toHaveBeenCalledWith(...)`, `Should -Invoke` are State/Side-effect assertions |
+| Flagging null/None checks before value checks as trivial | Only flag tests where the null/None check is the ONLY assertion |
+| Counting any Boolean assertion as trivial | Only always-true assertions (`Assert.IsTrue(true)`, `assert True`) are trivial |
+| Ignoring framework differences | Each framework has distinct assertion APIs — always read the matching language extension first. MSTest's `Assert.AreEqual`, xUnit's `Assert.Equal`, NUnit's `Is.EqualTo`, pytest's bare `assert ==`, and unittest's `self.assertEqual` all map to the **Equality** category |
+| Treating bare assertion forms as missing-framework | Bare `assert` in pytest is canonical — count it in the right category |
+| Treating mock-call verifications as assertion-free | `mock.Verify(...)`, `Received()`, `mock.assert_called_with(...)` are State/Side-effect assertions |
 | Recommending diversity for diversity's sake | Only suggest adding assertion types that would catch real bugs in the code under test |
 | Missing implicit assertions | Exception assertions are both Exception and Negative; snapshot/property-based tests are real assertions with implicit structure |
-| Async tests with unawaited assertions | TUnit, Jest with `.resolves`/`.rejects`, pytest-asyncio, Swift Testing, and Kotest all silently pass tests where assertions are not `await`ed — treat as assertion-free even when assertion calls are present |
+| Async tests with unawaited assertions | xUnit `async Task` tests calling `Assert.ThrowsAsync` without `await`, and pytest-asyncio tests with un-awaited coroutines, silently pass even when the underlying assertion would have failed — treat as assertion-free even when assertion calls are present |

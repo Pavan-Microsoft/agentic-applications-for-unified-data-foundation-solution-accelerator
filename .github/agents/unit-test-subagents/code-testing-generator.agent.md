@@ -115,9 +115,7 @@ recorded during research; do not replace a classic non-SDK build with `dotnet bu
 
 - **SDK-style .NET**: `dotnet build MySolution.sln --no-incremental` (no `--framework` flag — must build ALL target frameworks)
 - **Classic non-SDK .NET**: the repository's MSBuild command from research (often `MSBuild.exe MySolution.sln /t:Build`), preserving configuration/platform arguments
-- **TypeScript**: `npx tsc --noEmit` from workspace root
-- **Go**: `go build ./...` from module root
-- **Rust**: `cargo build`
+- **Python**: no build step required; run `pytest --collect-only` from the repo root to verify all test files are importable
 
 If it fails, call the `code-testing-fixer`, rebuild, retry up to 3 times.
 

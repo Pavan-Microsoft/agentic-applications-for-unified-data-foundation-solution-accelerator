@@ -1,16 +1,15 @@
 ---
 name: test-smell-detection
 description: >
-  Audits existing tests in any language using formal, research-backed test
-  smell names and the testsmells.org 19-smell academic taxonomy. Use when the
-  caller asks for an academic or citable test-smell review, named smell
-  categories, or a formal severity-ranked smell assessment. Covers Assertion
-  Roulette, Conditional Test Logic, Mystery Guest, Eager Test, Sleepy Test,
-  Unknown Test, Sensitive Equality, and the rest of the catalog across .NET,
-  Python, JavaScript/TypeScript, Java, Go, Ruby, Rust, Swift, Kotlin,
-  PowerShell, and C++. DO NOT USE FOR a quick pragmatic test review (use
-  test-anti-patterns), writing or running tests, framework migration, coverage,
-  or assertion-diversity metrics.
+  Audits existing tests in .NET (MSTest/xUnit/NUnit/TUnit) and Python
+  (pytest/unittest) using formal, research-backed test smell names and the
+  testsmells.org 19-smell academic taxonomy. Use when the caller asks for an
+  academic or citable test-smell review, named smell categories, or a formal
+  severity-ranked smell assessment. Covers Assertion Roulette, Conditional
+  Test Logic, Mystery Guest, Eager Test, Sleepy Test, Unknown Test, Sensitive
+  Equality, and the rest of the catalog. DO NOT USE FOR a quick pragmatic test
+  review (use test-anti-patterns), writing or running tests, framework
+  migration, coverage, or assertion-diversity metrics.
 license: MIT
 ---
 
@@ -65,8 +64,8 @@ framework idioms, and fixes native to the codebase.
 
 Apply these before assigning a finding:
 
-- Mock-call verifications, snapshots, bare pytest `assert`, Pester
-  `Should -Invoke`, and expected-exception constructs are assertions.
+- Mock-call verifications, snapshots, bare pytest `assert`, xUnit `Assert.Raises`,
+  MSTest `Assert.ThrowsException`, and other expected-exception constructs are assertions.
 - A literal or snapshot assertion may expose a coverage gap, but is not Unknown
   Test or another smell without separate evidence.
 - Count assertion statements. One assertion is never Assertion Roulette;
@@ -81,11 +80,11 @@ Apply these before assigning a finding:
 - Magic Number Test requires an unexplained oracle value. Do not flag ordinary
   setup quantities whose role is locally obvious and irrelevant to the asserted
   behavior.
-- Go table-driven subtests, pytest/JUnit/xUnit parameterization, Jest/Vitest
-  `.each`, RSpec data tables, Pester `-ForEach`, and Catch2
-  `SECTION`/`GENERATE` are not Conditional Test Logic by themselves.
-- Go's `if err != nil { t.Fatal(...) }` is idiomatic assertion flow, not
-  Exception Handling.
+- pytest `@pytest.mark.parametrize`, MSTest `[DataRow]` / `[DataTestMethod]`,
+  xUnit `[Theory]` / `[InlineData]` / `[MemberData]`, and NUnit `[TestCase]`
+  are not Conditional Test Logic by themselves.
+- pytest raises assertions such as `with pytest.raises(SomeError):` are
+  idiomatic assertion flow, not Exception Handling.
 - Integration markers legitimize declared external resources and multi-step
   flows, but not fixed sleeps or assertion-free execution.
 - A local temporary file still meets the formal Mystery Guest definition.
@@ -101,10 +100,6 @@ Apply these before assigning a finding:
   is supposed to invoke another component, a name/body mismatch is at most an
   unranked observation, not evidence that the test silently passes broken
   production behavior.
-- Catch2 `SECTION` and `GENERATE` are runner-controlled case expansion, and
-  `REQUIRE` is a real assertion. When those are the only suspicious constructs,
-  the academic-smell verdict is **clean**. Do not reverse that verdict because
-  the test could have broader behavioral coverage.
 - If no material smell remains after calibration, say that clearly. Never
   manufacture findings to fill a report.
 - Never propose `await` for a void or otherwise non-awaitable API. If production

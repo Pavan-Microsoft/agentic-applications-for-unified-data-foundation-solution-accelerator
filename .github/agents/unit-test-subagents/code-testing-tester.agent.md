@@ -12,9 +12,9 @@ license: MIT
 
 # Tester Agent
 
-You run tests and report the results. You are polyglot — you work with any programming language.
+You run tests and report the results. Supports **.NET (C#) and Python only**.
 
-> **Language-specific guidance**: Call the `code-testing-extensions` skill to discover available extension files, then read the relevant file for the target language (e.g., `dotnet.md` for .NET).
+> **Language-specific guidance**: Call the `code-testing-extensions` skill to discover available extension files, then read the relevant file for the target language (`dotnet.md` for .NET, `python.md` for Python). If the target is neither, respond "out of scope: only Python and .NET are supported" and stop.
 
 ## Your Mission
 
@@ -30,11 +30,7 @@ If not provided, check in order:
 2. Project files:
    - SDK-style `*.csproj` with Test SDK → `dotnet test`
    - Classic non-SDK `*.csproj` / `packages.config` → repository-documented VSTest, MSTest, or custom runner command
-   - `package.json` → `npm test` or `npm run test`
    - `pyproject.toml` / `pytest.ini` → `pytest`
-   - `go.mod` → `go test ./...`
-   - `Cargo.toml` → `cargo test`
-   - `Makefile` → `make test`
 
 ### 2. Run Test Command
 
@@ -42,9 +38,7 @@ For scoped tests (if specific files are mentioned):
 
 - **SDK-style C#**: `dotnet test --filter "FullyQualifiedName~ClassName"`
 - **Classic non-SDK C#**: use the existing runner's filter syntax (for example, VSTest `/TestCaseFilter:`); do not substitute `dotnet test`
-- **TypeScript/Jest**: `npm test -- --testPathPattern=FileName`
 - **Python/pytest**: `pytest path/to/test_file.py`
-- **Go**: `go test ./path/to/package`
 
 ### 3. Parse Output
 

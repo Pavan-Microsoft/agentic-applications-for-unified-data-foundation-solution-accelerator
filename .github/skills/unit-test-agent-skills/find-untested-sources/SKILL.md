@@ -4,9 +4,9 @@ description: >
   MANDATORY for static source-to-test pairing: find or list source files/modules
   without corresponding tests, or suggest test locations from repository
   structure. Invoke even for a tiny package; do not substitute manual globbing.
-  Uses Roslyn for C#/.NET and tree-sitter for Python, TS/JS, Go, Java, Rust, and
-  Ruby. DO NOT USE FOR: real line/branch/Cobertura data, coverage-backed test
-  priorities, CRAP risk, or grading existing tests.
+  Uses Roslyn for C#/.NET and tree-sitter for Python. DO NOT USE FOR: real
+  line/branch/Cobertura data, coverage-backed test priorities, CRAP risk, or
+  grading existing tests.
 license: MIT
 ---
 
@@ -34,10 +34,10 @@ This skill ships two interchangeable analyzers with a compatible JSON contract:
 | Engine | Script | Use when |
 |--------|--------|----------|
 | **Roslyn (C#)** | `scripts/Find-UntestedSources.cs` | The repo is **.NET-only**. Parses every `.cs` file with the Roslyn syntax API and does strict **namespace disambiguation**, so it is materially more accurate on duplicated short names like `Settings` or `Context`. |
-| **tree-sitter (polyglot)** | `scripts/find_untested_sources.py` | The repo is **not exclusively C#**, or you want one tool across Python, TypeScript/JavaScript, Go, Java, Rust, Ruby, and C#. |
+| **tree-sitter (Python)** | `scripts/find_untested_sources.py` | The repo contains Python, or you want one tool that also covers C# with a lighter-weight identifier-overlap engine. Only Python and C# are supported here. |
 
 For a .NET-only repository, **prefer the Roslyn engine** — its namespace-aware
-pairing beats the polyglot engine's identifier overlap.
+pairing beats the tree-sitter engine's identifier overlap.
 
 ## Required workflow
 
@@ -45,8 +45,8 @@ pairing beats the polyglot engine's identifier overlap.
    a parent workspace when the request identifies a subdirectory.
 2. Execute the appropriate analyzer once. Do not replace analyzer execution with
    manual globbing, filename matching, or visual inspection.
-   For polyglot analysis, pass `--include-tested` when the answer must distinguish
-   paired sources from unpaired sources.
+   For the tree-sitter engine, pass `--include-tested` when the answer must
+   distinguish paired sources from unpaired sources.
 3. Base the result on the analyzer's JSON. Preserve its paired/unpaired
    classification and suggested relative path; do not guess a different path.
 4. When the caller named a subdirectory, prefix analyzer-relative paths with
@@ -170,8 +170,8 @@ Diagnostics go to stderr; JSON goes to stdout.
 # From the skill folder
 python scripts/find_untested_sources.py <repo-root>
 
-# Restrict to a language (repeatable)
-python scripts/find_untested_sources.py <repo-root> --lang python --lang typescript
+# Restrict to a language (repeatable) — supported: python, csharp
+python scripts/find_untested_sources.py <repo-root> --lang python
 
 # Truncate the report (top 20 by declared API surface)
 python scripts/find_untested_sources.py <repo-root> --limit-untested 20 > pairing.json
@@ -226,20 +226,15 @@ stderr; JSON goes to stdout.
    | Language | Test rule |
    |---|---|
    | Python | path contains `tests/`/`test/`; or filename starts with `test_` or ends `_test.py`; or `conftest.py`. |
-   | JS/TS/TSX | path contains `__tests__`, `tests`, `test`, `spec`, `e2e`; or filename contains `.test.`/`.spec.`. |
-   | Go | filename ends `_test.go`. |
-   | Java | path contains `test`/`tests`; or filename ends `Test.java`/`Tests.java`. |
-   | Rust | path contains `tests/`/`benches/`. |
    | C# | path contains `tests/`; or project segment ends `.Tests`/`.Test`/`.UnitTests`/`.IntegrationTests`; or filename ends `Tests`/`Test`. |
-   | Ruby | path contains `spec/`/`test/`; or filename ends `_spec.rb`/`_test.rb`. |
 
 4. **Per-file extraction** — `process(text, ProcessConfig(structure, imports,
    symbols))` returns declared items, raw import statements, and a flat declared
    -name list.
-5. **Pairing** — for each test file, union **import resolution** (per language,
-   e.g. Python `from pkg.mod import x` → `pkg/mod.py`; Java `import a.b.C;` →
-   `a/b/C.java`; C# `using` is namespace-not-file, so a no-op) with **identifier
-   overlap** (word-like tokens, length ≥ 4, matched against declared names).
+5. **Pairing** — for each test file, union **import resolution** (per language:
+   Python `from pkg.mod import x` → `pkg/mod.py`; C# `using` is namespace-not-file,
+   so a no-op) with **identifier overlap** (word-like tokens, length ≥ 4,
+   matched against declared names).
 6. **JSON emit** — `untested_sources` ordered by declaration count descending.
 
 ## Limitations (be honest with the agent)
@@ -254,11 +249,10 @@ orders-of-magnitude lower cost than coverage. Known gaps:
   class is not named, so its file is not credited.
 - **`var`, target-typed `new()`, pattern matching** lose the type token; the
   file-level union usually still catches it through other references.
-- **Short identifier names** (polyglot, < 4 chars) are dropped to avoid noisy
+- **Short identifier names** (tree-sitter engine, < 4 chars) are dropped to avoid noisy
   pairings on names like `id`, `db`, `Tag`.
-- **Monorepo path aliases** (TS path mapping, Java module-info) are not
-  resolved; a suffix-match fallback may pick the wrong source if two files share
-  a trailing path segment.
+- **Monorepo path aliases** are not resolved; a suffix-match fallback may pick
+  the wrong source if two files share a trailing path segment.
 
 For these cases, run actual coverage (`coverage-analysis`) on the unpaired
 candidates the agent has already triaged.
@@ -273,10 +267,10 @@ file has an obvious matching or missing test.
   to test (highest declaration count first).
 - `*.suggested_test_path` — drop-in target for the new test file; the Roslyn
   engine honors the test project that already `<ProjectReference>`s the source's
-  project, so `dotnet sln add` is not needed. The polyglot engine may suggest a
+  project, so `dotnet sln add` is not needed. The tree-sitter engine may suggest a
   co-located test when no test root is discoverable; that is a valid fallback,
   but prefer an established repository test directory when one exists.
-- `source_to_tests` (Roslyn) / `--include-tested` `tested_sources` (polyglot) —
+- `source_to_tests` (Roslyn) / `--include-tested` `tested_sources` (tree-sitter) —
   verify a newly written test file lands in the list for the intended source.
-- `orphan_tests` (polyglot) — tests that don't reference any same-language
+- `orphan_tests` (tree-sitter) — tests that don't reference any same-language
   source file; useful for triaging stale or integration-only tests.

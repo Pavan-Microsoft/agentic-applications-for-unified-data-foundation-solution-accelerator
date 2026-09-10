@@ -5,11 +5,11 @@ description: >-
   that existing assertions would not catch, then optionally close verified
   gaps. Activate only when the request asks whether a bug/change/mutation could
   survive, names behavioral blind spots, or asks for missing edge cases tied to
-  production behavior. Polyglot. DO NOT USE FOR: suite organization, taxonomy,
-  metadata, or distribution reports (test-tagging); .NET line-vs-branch or
-  Cobertura interpretation, arithmetic, plateaus, project-wide coverage gaps,
-  or coverage-backed test/CRAP priorities (coverage-analysis; use native
-  coverage tooling outside .NET); named-target CRAP (crap-score); new suites
+  production behavior. Supports .NET and Python. DO NOT USE FOR: suite
+  organization, taxonomy, metadata, or distribution reports (test-tagging);
+  .NET line-vs-branch or Cobertura interpretation, arithmetic, plateaus,
+  project-wide coverage gaps, or coverage-backed test/CRAP priorities
+  (coverage-analysis); named-target CRAP (crap-score); new suites
   (code-testing-agent); assertion/smell audits; or mutation tools.
 license: MIT
 ---
@@ -274,9 +274,9 @@ the successful final command.
   null does not prove empty or whitespace when those inputs have different
   caller-visible outcomes. A kill clears only the edit and path that ran.
 - Private helpers reached through a public method remain in scope.
-- Error semantics are language-specific: in Rust, `?` propagation versus panic
-  is observable behavior; in C#, exception type and whether an input guard
-  accepts or rejects a value are observable behavior.
+- Error semantics are language-specific: in Python, `raise` versus a returned
+  sentinel value is observable behavior; in C#, exception type and whether an
+  input guard accepts or rejects a value are observable behavior.
 - Cross-check every exact amount or boundary result against the unmodified
   implementation or an existing exact assertion. If it cannot be checked,
   state the behavioral relation without inventing a number.

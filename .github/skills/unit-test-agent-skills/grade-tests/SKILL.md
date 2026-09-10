@@ -4,12 +4,12 @@ description: >
   Grade specified test methods individually and produce a concise PR-ready
   table with each fully qualified test name, an A-F grade, score band, and
   one-line note. USE FOR per-test feedback on a curated list such as new or
-  modified tests in a pull request, not a suite-wide audit. Polyglot: .NET,
-  Python, TS/JS, Java, Go, Ruby, Rust, Swift, Kotlin, PowerShell, C++. Inputs
-  may be test methods, method bodies, or file-and-line spans. DO NOT USE FOR:
-  full suite audits (use test-quality-auditor agent or test-anti-patterns),
-  writing new tests (use code-testing-generator agent or writing-mstest-tests),
-  fixing failures, or measuring code coverage.
+  modified tests in a pull request, not a suite-wide audit. Supports .NET
+  (MSTest/xUnit/NUnit/TUnit) and Python (pytest/unittest). Inputs may be test
+  methods, method bodies, or file-and-line spans. DO NOT USE FOR: full suite
+  audits (use test-quality-auditor agent or test-anti-patterns), writing new
+  tests (use code-testing-generator agent or writing-mstest-tests), fixing
+  failures, or measuring code coverage.
 license: MIT
 ---
 
@@ -23,11 +23,11 @@ holding a specific list) provides the test methods to grade.
 
 > **Language-specific guidance**: Call the `test-analysis-extensions` skill
 > to discover available extension files, then read the file matching the
-> target codebase's language and framework (e.g., `extensions/dotnet.md`,
-> `extensions/python.md`, `extensions/typescript.md`, `extensions/go.md`).
-> You MUST read the relevant extension file before scoring assertions or
-> anti-patterns, because assertion APIs and idiomatic patterns differ
-> significantly across frameworks.
+> target codebase's language and framework (`extensions/dotnet.md` for .NET,
+> `extensions/python.md` for pytest/unittest). You MUST read the relevant
+> extension file before scoring assertions or anti-patterns, because
+> assertion APIs and idiomatic patterns differ significantly across
+> frameworks. Only .NET and Python are supported.
 
 ## Why a Per-Test Grade
 
@@ -52,7 +52,7 @@ that question with a one-row-per-test verdict that fits in a comment table.
   `test-anti-patterns` (pragmatic) or `test-smell-detection` (formal) and
   let the `test-quality-auditor` agent orchestrate.
 - The caller wants to *write* new tests — use `code-testing-generator`
-  (any language) or `writing-mstest-tests` (MSTest specifically).
+  (.NET or Python) or `writing-mstest-tests` (MSTest specifically).
 - The caller wants to measure code coverage or CRAP scores — use
   `coverage-analysis` or `crap-score` (.NET only).
 - The caller wants to fix issues directly in test code — invoke the
@@ -91,12 +91,12 @@ diff, and optionally point them at `test-quality-auditor` agent or
 
 Identify the target codebase's language and test framework from the file
 extensions and the test method markers in the provided list. Call the
-`test-analysis-extensions` skill and read the matching extension file (e.g.,
-`extensions/dotnet.md` for MSTest/xUnit/NUnit/TUnit, `extensions/python.md`
-for pytest, `extensions/typescript.md` for Jest/Vitest, `extensions/go.md`
-for the standard `testing` package). If the input contains tests from
-multiple languages, load each relevant extension and grade each test using
-its language's conventions.
+`test-analysis-extensions` skill and read the matching extension file
+(`extensions/dotnet.md` for MSTest/xUnit/NUnit/TUnit, `extensions/python.md`
+for pytest/unittest). If the input contains tests from both .NET and Python,
+load both extensions and grade each test using its language's conventions.
+If the input contains tests from any other language, decline the request and
+report that only .NET and Python are supported.
 
 ### Step 2: Resolve the test bodies
 
@@ -133,21 +133,18 @@ assertion in the test body. Score from highest to lowest:
 
 | Sub-grade | Pattern |
 |-----------|---------|
-| **A** | At least one meaningful value assertion (equality / structural / exception / state) plus, where appropriate, additional checks (negative, type, collection contents). Mock-call verifications (`Verify`, `toHaveBeenCalledWith`, `Should -Invoke`) and bare assertion forms (pytest `assert`, Go `if got != want { t.Errorf(...) }`, Rust `assert!()`) count as real assertions. |
+| **A** | At least one meaningful value assertion (equality / structural / exception / state) plus, where appropriate, additional checks (negative, type, collection contents). Mock-call verifications (`Verify` (Moq), `Received()` (NSubstitute), `mock.assert_called_with(...)` (`unittest.mock`)) and bare assertion forms (pytest `assert`) count as real assertions. |
 | **B** | One clear meaningful assertion that verifies the behavior under test. |
-| **C** | Only trivial assertions (single `IsNotNull` / `toBeDefined` / `assert x is not None`), or assertions that check a single field while the operation produces a richer result. |
-| **D** | One self-referential / tautological assertion (`Assert.AreEqual(x, x)`, `assert dto.name == dto.name`, round-trip identity without a non-trivial input), or broad exception assertions (`Assert.ThrowsException<Exception>`). |
-| **F** | No assertions at all; **all** assertions are always-true literals (`Assert.IsTrue(true)`, `assert True`, `expect(true).toBe(true)`) — these verify nothing and are equivalent to having no assertions; or all assertions are silently un-awaited (e.g., `expect(promise).resolves.toBe(x)` without `await`/`return`, async TUnit/xUnit `Assert.ThrowsAsync` without `await`, pytest-asyncio with un-awaited coroutine). |
+| **C** | Only trivial assertions (single `IsNotNull` / `assert x is not None`), or assertions that check a single field while the operation produces a richer result. |
+| **D** | One self-referential / tautological assertion (`Assert.AreEqual(x, x)`, `assert dto.name == dto.name`, round-trip identity without a non-trivial input), or broad exception assertions (`Assert.ThrowsException<Exception>`, `pytest.raises(Exception)`). |
+| **F** | No assertions at all; **all** assertions are always-true literals (`Assert.IsTrue(true)`, `assert True`) — these verify nothing and are equivalent to having no assertions; or all assertions are silently un-awaited (e.g., async xUnit `Assert.ThrowsAsync` without `await`, pytest-asyncio with un-awaited coroutine). |
 
 Exception and error-path tests (`Assert.ThrowsException<T>`, constrained
-`pytest.raises`, `expect(fn).toThrow`, `assertThrows`, `#[should_panic]`,
-`Should -Throw`, `EXPECT_THROW`, or Go code that verifies an expected non-nil
-error) are complete on their own. Give Assertion strength **A** when the test
-checks the exact promised error condition for its stated scope. Do not deduct
-for having only that assertion, and do not require an error-message assertion
-unless the message is part of the documented contract. A Go happy-path test
-that only checks `err == nil` while discarding a meaningful returned value is
-still **C** because it does not verify the successful result.
+`pytest.raises`, `self.assertRaises`) are complete on their own. Give
+Assertion strength **A** when the test checks the exact promised error
+condition for its stated scope. Do not deduct for having only that assertion,
+and do not require an error-message assertion unless the message is part of
+the documented contract.
 
 ##### B. Structure & focus
 
@@ -156,7 +153,7 @@ still **C** because it does not verify the successful result.
 | **A** | Clear Arrange-Act-Assert (or Given-When-Then) separation. Single behavior under test. Body under ~30 lines. Setup uses framework conventions. |
 | **B** | One mild structural issue (slightly long body, missing blank lines between phases) but intent is clear. |
 | **C** | Multiple behaviors mixed in one test, or AAA phases interleaved enough to slow comprehension. |
-| **D** | Conditional logic in the test (`if`/`switch` driving assertions) — except for idiomatic Go/Rust table-driven sub-test loops; or test relies on previous test state (ordering dependency). |
+| **D** | Conditional logic in the test (`if`/`switch` driving assertions) — except for idiomatic pytest parametrize loops; or test relies on previous test state (ordering dependency). |
 | **F** | Test exceeds ~60 lines and verifies multiple unrelated behaviors; or shares mutable state with other tests through statics/globals without reset. |
 
 ##### C. Anti-pattern hygiene
@@ -188,15 +185,12 @@ Examples (Critical/High and Medium counts → Anti-pattern sub-grade):
 **Critical (drop straight to F or D)**
 
 - No assertions at all → F (also drives Assertion sub-grade to F)
-- Swallowed exceptions: `try { … } catch { }` (.NET), bare `except: pass`
-  (Python), `try { … } catch (e) {}` (JS/TS/Java), `defer recover()`
-  without re-panic (Go), `rescue StandardError` with no assertion (Ruby),
-  empty `catch` (Kotlin/Swift) → F
+- Swallowed exceptions: `try { … } catch { }` (.NET) or bare `except: pass`
+  / `except Exception: pass` (Python) → F
 - Assert-in-catch pattern (`Assert.Fail(ex.Message)` instead of
   `Assert.ThrowsException`) → D
-- Always-true literal assertions (`Assert.IsTrue(true)`, `assert True`,
-  `expect(true).toBe(true)`) → **F** (verifies nothing; also drives
-  Assertion sub-grade to F)
+- Always-true literal assertions (`Assert.IsTrue(true)`, `assert True`) →
+  **F** (verifies nothing; also drives Assertion sub-grade to F)
 - Self-referential / tautological assertions on bound values
   (`Assert.AreEqual(x, x)`, `assert dto.name == dto.name`) → D
 - Commented-out assertions → D
@@ -204,19 +198,14 @@ Examples (Critical/High and Medium counts → Anti-pattern sub-grade):
 **High (drop one or two sub-grades)**
 
 - Wall-clock sleep used for synchronization: `Thread.Sleep`, `Task.Delay`,
-  `time.sleep`, `setTimeout`-based wait, `Thread.sleep`, `time.Sleep`,
-  `sleep`, `std::thread::sleep`, `Start-Sleep`,
-  `std::this_thread::sleep_for` (in a unit test) → D
+  `time.sleep`, `asyncio.sleep` in a unit test → D
 - Unseeded randomness, wall-clock reads without abstraction
-  (`DateTime.Now`, `datetime.now()`, `Date.now()`,
-  `System.currentTimeMillis()`, `time.Now()`, `Time.now`,
-  `Instant::now()`, `Get-Date`, `system_clock::now`) → D
+  (`DateTime.Now`, `DateTime.UtcNow`, `datetime.now()`,
+  `datetime.utcnow()`) → D
 - Hard-coded environment-dependent paths (`C:\…`, `/tmp/…`, network hosts) → D
-- Ordering dependency on mutable static / package globals → D
+- Ordering dependency on mutable static / module-level globals → D
 - Broad exception assertion (`Assert.ThrowsException<Exception>`,
-  `pytest.raises(Exception)`, `expect(fn).toThrow(Error)` without matcher,
-  `#[should_panic]` without `expected = "…"`, `Should -Throw` without
-  `-ExpectedMessage`, `EXPECT_ANY_THROW`) → C
+  `pytest.raises(Exception)`, `self.assertRaises(Exception)`) → C
 - Over-mocking: more mock setup lines than test logic, or verifying exact
   call sequences instead of outcomes → C
 - Implementation coupling: reflection on private members, casting to
@@ -236,8 +225,7 @@ Examples (Critical/High and Medium counts → Anti-pattern sub-grade):
 **Low (note only, no deduction)**
 
 - Unused setup/teardown hooks; print debugging left in (`Console.WriteLine`,
-  `print`, `console.log`, `System.out.println`, `fmt.Println`, `puts`,
-  `dbg!`, `Write-Host`, `std::cout`); inconsistent naming versus siblings;
+  `Debug.WriteLine`, `print`); inconsistent naming versus siblings;
   leftover TODO comments. Mention in the note column but do not deduct.
 
 #### Combining sub-grades
@@ -321,10 +309,11 @@ prefix each section with the language name and framework.
       are not classified as always-true; only literal `true`/`false` constants are.
 - [ ] Self-referential assertions are flagged separately from normal
       equality assertions.
-- [ ] Idiomatic patterns are not flagged: Go/Rust table-driven sub-tests,
-      pytest bare `assert`, Go `if got != want { t.Errorf(...) }`,
-      JS/TS `expect(mock).toHaveBeenCalledWith(...)`.
-- [ ] Async test pitfalls (un-awaited `resolves`/`rejects`/`ThrowsAsync`,
+- [ ] Idiomatic patterns are not flagged: pytest bare `assert`, pytest
+      `@pytest.mark.parametrize` loops, MSTest `[DataTestMethod]` /
+      `[DynamicData]`, xUnit `[Theory]` / `[InlineData]`, NSubstitute
+      `Received()`, Moq `Verify(...)`.
+- [ ] Async test pitfalls (un-awaited xUnit `Assert.ThrowsAsync`,
       pytest-asyncio without `await`) drop the Assertion sub-grade to F.
 - [ ] The summary leads with the highest-leverage observation, not a recap
       of the table.
@@ -336,11 +325,10 @@ prefix each section with the language name and framework.
 | Grading every test in the workspace when no list is provided | Ask the caller for the explicit list; this skill is for curated input. |
 | Inflating deductions to justify the grade | Start at A; deduct only for observable issues. |
 | Penalizing exception tests for low assertion count | Exception assertions are complete on their own. |
-| Downgrading a focused Go error-path test because it checks only `err != nil` | Expected-error existence is the observable contract for that scope; keep it at A unless the production contract requires a specific error identity or message. |
-| Treating `IsNotNull` before a value assertion as trivial | Only flag when the null check is the **only** assertion. |
+| Treating `IsNotNull` / `assert x is not None` before a value assertion as trivial | Only flag when the null check is the **only** assertion. |
 | Treating any Boolean assertion as effectively assertion-free | Only always-true literals (`Assert.IsTrue(true)`, `assert True`) are; meaningful `Assert.IsTrue(result.IsValid)` is a real assertion. |
-| Flagging Go/Rust table-driven loops as conditional logic | They are idiomatic; do not deduct. |
-| Treating pytest bare `assert` or Go `if got != want { t.Error… }` as missing-framework | Both are canonical; count in the correct assertion category. |
+| Flagging pytest parametrize / xUnit `[Theory]` loops as conditional logic | They are idiomatic; do not deduct. |
+| Treating pytest bare `assert` as missing-framework | It is canonical; count in the correct assertion category. |
 | Penalizing tests when production code is unavailable | Mark concerns about uncovered behaviors as `Unverified` and do not deduct. |
 | Using a fake-precise score (e.g., 87/100) | Use the score band only — 90–100, 80–89, 70–79, 60–69, 0–59. |
 | Spilling a 500-row table into a PR comment | Apply the row cap from Step 5; collapse extras into `<details>`. |

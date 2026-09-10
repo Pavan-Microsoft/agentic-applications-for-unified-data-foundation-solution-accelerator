@@ -15,7 +15,7 @@ license: MIT
 
 # Code Testing Generation Skill
 
-An AI-powered skill that generates comprehensive, workable unit tests for any programming language using a coordinated multi-agent pipeline.
+An AI-powered skill that generates comprehensive, workable unit tests for .NET (C#) and Python using a coordinated multi-agent pipeline.
 
 ## Non-negotiable execution contract
 
@@ -148,7 +148,7 @@ For multi-file requests:
 1. Turn every explicit user requirement into a checklist before implementation. Include requested layers, collaborators to mock, boundary cases, integrations, coverage thresholds, and report artifacts. Copy multi-condition requirements verbatim — they must each map to one test that exercises the whole combination.
 2. Research only the requested module or project and write the checklist plus a compact target inventory to `.testagent/research.md`.
 3. Reuse manifests, symbol references, and deterministic pairing tools instead of reading every source and test file.
-4. For multi-file scopes in C#, Python, TypeScript/JavaScript, Go, Java, Rust, or Ruby, run `find-untested-sources` once and consume its pairing and suggested-path output; do not repeat that discovery manually.
+4. For multi-file scopes in C# or Python, run `find-untested-sources` once and consume its pairing and suggested-path output; do not repeat that discovery manually.
 5. Plan each target file once, then implement phases sequentially. Map every checklist item to at least one concrete test or explain why it is blocked.
 6. Build and test the narrow target during fix cycles; run workspace-level validation once at the end.
 7. Before reporting success, re-open the generated tests and verify every checklist item against concrete test names and assertions. Coverage alone is not evidence that a requested mock seam, boundary, state transition, or property combination was tested.
@@ -259,7 +259,7 @@ Most failures in generated tests are caused by **wrong expected values in assert
 
 ### Wrong testing framework detected
 
-Specify your preferred framework in the initial request: "Generate Jest tests for..."
+Specify your preferred framework in the initial request: "Generate xUnit tests for..." or "Generate pytest tests for..."
 
 ### Environment-dependent tests fail
 
